@@ -14,7 +14,8 @@ from fastapi.responses import JSONResponse
 import uvicorn
 
 from src.models.database import Device, EnergyReading, DailyReport, get_db, create_tables
-from src.agents.collector import collector
+from src.integrations.tapo_client import TapoClient
+from src.integrations.nova_digital_client import NovaDigitalClient, DeviceClientFactory
 from src.services.energy_service import energy_service
 from src.services.notification_service import notification_service
 from src.services.llm_service import llm_service
@@ -513,6 +514,153 @@ Forneça recomendações específicas para otimizar o consumo deste dispositivo.
     except Exception as e:
         logger.error(f"Erro ao gerar recomendações: {str(e)}")
         raise HTTPException(status_code=500, detail="Erro ao gerar recomendações")
+
+
+# Endpoints de Teste de Conexão
+@app.post("/devices/test-connection")
+async def test_device_connection(connection_data: Dict):
+    """
+    Testar conexão com dispositivo antes de adicionar
+    
+    Args:
+        connection_data: {
+            "type": "TAPO" | "NOVA_DIGITAL",
+            "ip_address": "192.168.1.100" (para TAPO),
+            "api_key": "sua_api_key" (para Nova Digital)
+        }
+    """
+    try:
+        device_type = connection_data.get("type", "").upper()
+        
+        if device_type == "TAPO":
+            ip_address = connection_data.get("ip_address")
+            if not ip_address:
+                raise HTTPException(status_code=400, detail="IP address required for TAPO devices")
+            
+            # Testar conexão TAPO
+            tapo_client = TapoClient(
+                username=settings.tapo_username,
+                password=settings.tapo_password
+            )
+            
+            success = await tapo_client.add_device(ip_address, "test_device")
+            
+            if success:
+                return {
+                    "success": True,
+                    "message": "Conexão TAPO estabelecida com sucesso",
+                    "device_type": "TAPO",
+                    "ip_address": ip_address
+                }
+            else:
+                return {
+                    "success": False,
+                    "message": "Falha na conexão TAPO - verifique IP e credenciais",
+                    "device_type": "TAPO",
+                    "ip_address": ip_address
+                }
+        
+        elif device_type == "NOVA_DIGITAL":
+            api_key = connection_data.get("api_key")
+            if not api_key:
+                raise HTTPException(status_code=400, detail="API key required for Nova Digital devices")
+            
+            # Testar conexão Nova Digital
+            async with NovaDigitalClient(api_key=api_key) as nova_client:
+                success = await nova_client.test_connection()
+                
+                if success:
+                    devices = await nova_client.get_devices()
+                    return {
+                        "success": True,
+                        "message": "Conexão Nova Digital estabelecida com sucesso",
+                        "device_type": "NOVA_DIGITAL",
+                        "available_devices": len(devices),
+                        "devices": devices[:5]  # Primeiros 5 dispositivos
+                    }
+                else:
+                    return {
+                        "success": False,
+                        "message": "Falha na conexão Nova Digital - verifique API key",
+                        "device_type": "NOVA_DIGITAL"
+                    }
+        
+        else:
+            raise HTTPException(status_code=400, detail=f"Device type {device_type} not supported")
+            
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Erro ao testar conexão: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Erro ao testar conexão: {str(e)}")
+
+
+@app.get("/devices/supported-types")
+async def get_supported_device_types():
+    """
+    Obter lista de tipos de dispositivos suportados
+    """
+    return {
+        "supported_types": [
+            {
+                "type": "TAPO",
+                "description": "TP-Link TAPO smart plugs",
+                "connection_type": "Local IP",
+                "required_fields": ["ip_address"],
+                "auth_method": "Email + Password"
+            },
+            {
+                "type": "NOVA_DIGITAL",
+                "description": "Nova Digital smart plugs",
+                "connection_type": "Cloud API",
+                "required_fields": ["api_key"],
+                "auth_method": "API Key"
+            }
+        ]
+    }
+
+
+@app.post("/devices/discover-local")
+async def discover_local_devices():
+    """
+    Descobrir dispositivos TAPO na rede local
+    """
+    try:
+        # Esta é uma implementação básica - em produção, usaríamos um scanner de rede
+        common_ips = [
+            "192.168.1.100", "192.168.1.101", "192.168.1.102",
+            "192.168.0.100", "192.168.0.101", "192.168.0.102"
+        ]
+        
+        discovered_devices = []
+        tapo_client = TapoClient(
+            username=settings.tapo_username,
+            password=settings.tapo_password
+        )
+        
+        for ip in common_ips:
+            try:
+                # Tentativa rápida de conexão
+                success = await tapo_client.add_device(ip, f"discovered_{ip}")
+                if success:
+                    discovered_devices.append({
+                        "ip_address": ip,
+                        "type": "TAPO",
+                        "status": "online",
+                        "suggested_name": f"TAPO_Device_{ip.split('.')[-1]}"
+                    })
+            except:
+                continue
+        
+        return {
+            "discovered_devices": discovered_devices,
+            "total_found": len(discovered_devices),
+            "scan_type": "basic_ip_range"
+        }
+        
+    except Exception as e:
+        logger.error(f"Erro ao descobrir dispositivos: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Erro ao descobrir dispositivos: {str(e)}")
 
 
 if __name__ == "__main__":

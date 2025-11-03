@@ -24,6 +24,10 @@ class Settings(BaseSettings):
     tapo_password: str = ""
     tapo_devices: List[str] = []
     
+    # Nova Digital
+    nova_digital_api_key: str = ""
+    nova_digital_base_url: str = "https://api.novadigital.com.br"
+    
     # Configuração de Energia
     energy_cost_per_kwh: float = 0.85  # R$ por kWh
     

@@ -13,6 +13,7 @@ redis==5.0.1
 pytapo==3.3.12
 requests==2.31.0
 aiohttp==3.9.1
+python-socketio==5.10.0
 
 # Processamento de Dados
 pandas==2.1.3
