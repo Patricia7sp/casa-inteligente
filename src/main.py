@@ -17,6 +17,7 @@ from src.models.database import Device, EnergyReading, DailyReport, get_db, crea
 from src.agents.collector import collector
 from src.services.energy_service import energy_service
 from src.services.notification_service import notification_service
+from src.services.llm_service import llm_service
 from src.utils.config import settings
 from src.utils.logger import setup_logging
 
@@ -364,6 +365,154 @@ async def test_notifications():
     except Exception as e:
         logger.error(f"Erro ao testar notificações: {str(e)}")
         raise HTTPException(status_code=500, detail="Erro ao testar notificações")
+
+
+# Endpoints do LLM
+@app.post("/ai/ask")
+async def ask_ai_assistant(question_data: Dict):
+    """
+    Fazer pergunta ao assistente inteligente LLM
+    
+    Args:
+        question_data: {"question": "sua pergunta", "provider": "openai|gemini|auto"}
+    
+    Returns:
+        Resposta do assistente com contexto do sistema
+    """
+    try:
+        question = question_data.get("question", "")
+        provider = question_data.get("provider", "auto")
+        
+        if not question:
+            raise HTTPException(status_code=400, detail="Pergunta não fornecida")
+        
+        response = await llm_service.ask_question(question, provider)
+        
+        if "error" in response:
+            raise HTTPException(status_code=500, detail=response["error"])
+        
+        return response
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Erro ao processar pergunta LLM: {str(e)}")
+        raise HTTPException(status_code=500, detail="Erro ao processar pergunta")
+
+
+@app.get("/ai/insights")
+async def get_energy_insights(days: int = 7):
+    """
+    Obter insights automáticos sobre consumo de energia
+    
+    Args:
+        days: Número de dias para análise (padrão: 7)
+    
+    Returns:
+        Insights e recomendações automáticas
+    """
+    try:
+        if days < 1 or days > 365:
+            raise HTTPException(status_code=400, detail="Período deve estar entre 1 e 365 dias")
+        
+        insights = llm_service.get_energy_insights(days)
+        
+        if "error" in insights:
+            raise HTTPException(status_code=500, detail=insights["error"])
+        
+        return insights
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Erro ao gerar insights: {str(e)}")
+        raise HTTPException(status_code=500, detail="Erro ao gerar insights")
+
+
+@app.get("/ai/context")
+async def get_ai_context():
+    """
+    Obter contexto atual do sistema para o LLM
+    
+    Returns:
+        Contexto completo do sistema
+    """
+    try:
+        context = llm_service.get_system_context()
+        return {"context": context, "timestamp": datetime.utcnow()}
+        
+    except Exception as e:
+        logger.error(f"Erro ao obter contexto LLM: {str(e)}")
+        raise HTTPException(status_code=500, detail="Erro ao obter contexto")
+
+
+@app.post("/ai/recommendations")
+async def get_personalized_recommendations(device_data: Dict):
+    """
+    Obter recomendações personalizadas para um dispositivo específico
+    
+    Args:
+        device_data: {"device_id": 1, "days": 30}
+    
+    Returns:
+        Recomendações personalizadas
+    """
+    try:
+        device_id = device_data.get("device_id")
+        days = device_data.get("days", 30)
+        
+        if not device_id:
+            raise HTTPException(status_code=400, detail="ID do dispositivo não fornecido")
+        
+        # Obter informações do dispositivo
+        db = next(get_db())
+        device = db.query(Device).filter(Device.id == device_id).first()
+        
+        if not device:
+            db.close()
+            raise HTTPException(status_code=404, detail="Dispositivo não encontrado")
+        
+        # Obter tendências do dispositivo
+        trends = energy_service.get_consumption_trends(device_id, days)
+        
+        if not trends:
+            db.close()
+            raise HTTPException(status_code=404, detail="Nenhum dado encontrado para este dispositivo")
+        
+        # Gerar recomendações personalizadas
+        question = f"""
+Baseado nos dados do dispositivo '{device.name}' ({device.location}) nos últimos {days} dias:
+- Consumo total: {trends['total_energy_kwh']:.3f} kWh
+- Custo total: R$ {trends['total_cost']:.2f}
+- Média diária: {trends['average_daily_energy_kwh']:.3f} kWh
+- Pico: {trends['max_daily_energy_kwh']:.3f} kWh
+
+Forneça recomendações específicas para otimizar o consumo deste dispositivo.
+"""
+        
+        response = await llm_service.ask_question(question, "auto")
+        
+        db.close()
+        
+        if "error" in response:
+            raise HTTPException(status_code=500, detail=response["error"])
+        
+        return {
+            "device_info": {
+                "name": device.name,
+                "location": device.location,
+                "equipment": device.equipment_connected
+            },
+            "trends": trends,
+            "recommendations": response["response"],
+            "generated_at": datetime.utcnow()
+        }
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Erro ao gerar recomendações: {str(e)}")
+        raise HTTPException(status_code=500, detail="Erro ao gerar recomendações")
 
 
 if __name__ == "__main__":
