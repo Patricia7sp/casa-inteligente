@@ -1,0 +1,51 @@
+# Framework Web
+fastapi==0.104.1
+uvicorn[standard]==0.24.0
+streamlit==1.28.1
+
+# Banco de Dados
+sqlalchemy==2.0.23
+psycopg2-binary==2.9.9
+alembic==1.12.1
+redis==5.0.1
+
+# APIs de Tomadas Inteligentes
+pytapo==3.3.12
+requests==2.31.0
+aiohttp==3.9.1
+
+# Processamento de Dados
+pandas==2.1.3
+numpy==1.25.2
+scikit-learn==1.3.2
+
+# Monitoramento e Logging
+prometheus-client==0.19.0
+structlog==23.2.0
+
+# Notificações
+python-telegram-bot==20.6
+smtplib2==0.2.1
+
+# LLM e IA
+openai==1.3.7
+google-generativeai==0.3.2
+
+# Configuração e Ambiente
+python-dotenv==1.0.0
+pydantic==2.5.0
+pydantic-settings==2.1.0
+
+# Testes
+pytest==7.4.3
+pytest-asyncio==0.21.1
+pytest-cov==4.1.0
+httpx==0.25.2
+
+# Deploy e Docker
+gunicorn==21.2.0
+
+# Utilitários
+schedule==1.2.0
+python-dateutil==2.8.2
+pytz==2023.3
