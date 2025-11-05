@@ -15,8 +15,8 @@ class Settings(BaseSettings):
     app_version: str = "1.0.0"
     debug: bool = False
     
-    # Banco de Dados
-    database_url: str = "postgresql://user:password@localhost/casa_inteligente"
+    # Banco de Dados PostgreSQL
+    database_url: str = "postgresql://postgres:casa_inteligente_2024@localhost:5432/casa_inteligente"
     redis_url: str = "redis://localhost:6379"
     
     # APIs de Tomadas
@@ -24,9 +24,15 @@ class Settings(BaseSettings):
     tapo_password: str = ""
     tapo_devices: List[str] = []
     
-    # Nova Digital
-    nova_digital_api_key: str = ""
-    nova_digital_base_url: str = "https://api.novadigital.com.br"
+    # Tuya Cloud (NovaDigital usa plataforma Tuya)
+    tuya_access_id: str = ""
+    tuya_access_key: str = ""
+    tuya_region: str = "us"
+    
+    # Tuya Local (opcional - para controle local)
+    tuya_device_id: str = ""
+    tuya_local_key: str = ""
+    tuya_ip_address: str = ""
     
     # Configuração de Energia
     energy_cost_per_kwh: float = 0.85  # R$ por kWh

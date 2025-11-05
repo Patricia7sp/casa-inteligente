@@ -155,3 +155,75 @@ service-account-key.json
 *.temp
 temp/
 tmp/
+
+# Scripts de teste (não fazer commit)
+scripts/test_*.py
+scripts/*test*.py
+scripts/debug_*.py
+scripts/*debug*.py
+scripts/check_*.py
+scripts/diagnose_*.py
+scripts/scan_*.py
+scripts/analyze_*.py
+scripts/investigate_*.py
+scripts/reverse_*.py
+scripts/intercept_*.py
+scripts/capture_*.py
+scripts/discover_*.py
+scripts/extract_*.py
+scripts/get_*.py
+scripts/find_*.py
+scripts/monitor_*.py
+scripts/alternative_*.py
+scripts/final_*.py
+scripts/last_*.py
+scripts/definitive_*.py
+scripts/setup_*.py
+scripts/configure_*.py
+scripts/create_*.py
+scripts/open_*.py
+scripts/auto_*.py
+scripts/parse_*.py
+scripts/download_*.py
+scripts/integrate_*.py
+scripts/localtuya_*.py
+scripts/smartlife_*.py
+
+# Guias temporários (não fazer commit)
+GUIA_*.md
+CHECKLIST_*.md
+CONFIGURACAO_*.md
+PASSOS_*.md
+PROXIMO_*.md
+RESUMO_*.md
+SETUP_*.md
+SOLUCAO_*.md
+SOLUCOES_*.md
+STATUS_*.md
+INTEGRACAO_*.md
+
+# Dados sensíveis e credenciais
+config/gmail_credentials.json
+config/gmail_token.pickle
+config/*_credentials.json
+config/*_token.*
+*.pem
+*.key
+*.crt
+
+# Dados de runtime
+data/smartlife/
+data/reports/
+data/parsed/
+data/analysis/
+data/*/processed_*.json
+data/*/emails_*.json
+data/*/latest.json
+
+# Logs
+logs/*.log
+*.log
+
+# Arquivos HTML baixados
+*.html
+!docs/**/*.html

@@ -9,6 +9,8 @@ import plotly.express as px
 import plotly.graph_objects as go
 from datetime import datetime, timedelta
 import time
+import json
+from pathlib import Path
 
 # Configuração da página
 st.set_page_config(
@@ -178,6 +180,137 @@ if realtime_data and "devices" in realtime_data:
                 yaxis_title="Quantidade"
             )
             st.plotly_chart(fig_status, use_container_width=True)
+
+# Seção SmartLife (Geladeira Nova Digital)
+st.markdown("---")
+st.markdown("## 🧊 Geladeira Nova Digital (SmartLife)")
+
+# Carregar dados do SmartLife
+smarlife_file = Path('data/smartlife/latest.json')
+
+if smartlife_file.exists():
+    try:
+        with open(smartlife_file, 'r', encoding='utf-8') as f:
+            smartlife_data = json.load(f)
+        
+        # Cards de métricas
+        col1, col2, col3, col4 = st.columns(4)
+        
+        metrics = smartlife_data.get('metrics', {})
+        
+        with col1:
+            st.metric(
+                label="⚡ Consumo Diário",
+                value=f"{metrics.get('daily_average_kwh', 0):.2f} kWh",
+                delta=None
+            )
+        
+        with col2:
+            st.metric(
+                label="📊 Projeção Mensal",
+                value=f"{metrics.get('monthly_projection_kwh', 0):.1f} kWh",
+                delta=None
+            )
+        
+        with col3:
+            st.metric(
+                label="💰 Custo Estimado",
+                value=f"R$ {metrics.get('estimated_monthly_cost_brl', 0):.2f}/mês",
+                delta=None
+            )
+        
+        with col4:
+            status = metrics.get('status', 'unknown')
+            status_emoji = "🟢" if status == "normal" else "⚠️"
+            st.metric(
+                label="📈 Status",
+                value=f"{status_emoji} {status.title()}",
+                delta=None
+            )
+        
+        # Informações adicionais
+        with st.expander("📋 Detalhes do Relatório SmartLife"):
+            st.write(f"**Fonte:** {smartlife_data.get('source', 'N/A')}")
+            st.write(f"**Dispositivo:** {smartlife_data.get('device_name', 'N/A')}")
+            st.write(f"**Última Atualização:** {smartlife_data.get('timestamp', 'N/A')}")
+            st.write(f"**Data do Email:** {smartlife_data.get('email_date', 'N/A')}")
+            
+            if smartlife_data.get('html_file'):
+                st.write(f"**Relatório HTML:** {smartlife_data.get('html_file')}")
+            
+            # Mostrar dados brutos
+            if st.checkbox("Mostrar dados brutos"):
+                st.json(smartlife_data)
+        
+        # Gráfico de consumo
+        st.markdown("### 📊 Análise de Consumo")
+        
+        col1, col2 = st.columns(2)
+        
+        with col1:
+            # Gráfico de comparação
+            consumption_data = {
+                'Categoria': ['Consumo Atual', 'Média Normal (Min)', 'Média Normal (Max)'],
+                'kWh/dia': [
+                    metrics.get('daily_average_kwh', 0),
+                    0.8,  # Mínimo normal para geladeira
+                    2.5   # Máximo normal para geladeira
+                ]
+            }
+            
+            fig_comparison = px.bar(
+                consumption_data,
+                x='Categoria',
+                y='kWh/dia',
+                title='Consumo vs. Faixa Normal',
+                color='Categoria',
+                color_discrete_map={
+                    'Consumo Atual': '#FF6B6B',
+                    'Média Normal (Min)': '#4ECDC4',
+                    'Média Normal (Max)': '#95E1D3'
+                }
+            )
+            st.plotly_chart(fig_comparison, use_container_width=True)
+        
+        with col2:
+            # Gráfico de projeção de custo
+            cost_data = {
+                'Período': ['Diário', 'Semanal', 'Mensal', 'Anual'],
+                'Custo (R$)': [
+                    metrics.get('daily_average_kwh', 0) * 0.85,
+                    metrics.get('daily_average_kwh', 0) * 0.85 * 7,
+                    metrics.get('estimated_monthly_cost_brl', 0),
+                    metrics.get('estimated_monthly_cost_brl', 0) * 12
+                ]
+            }
+            
+            fig_cost = px.line(
+                cost_data,
+                x='Período',
+                y='Custo (R$)',
+                title='Projeção de Custos',
+                markers=True
+            )
+            st.plotly_chart(fig_cost, use_container_width=True)
+        
+        # Recomendações
+        if metrics.get('daily_average_kwh', 0) > 2.5:
+            st.warning("⚠️ **Atenção:** Consumo acima do normal para geladeiras. Verifique:")
+            st.markdown("""
+            - 🚪 Vedação da porta
+            - 🧹 Limpeza das serpentinas
+            - 🌡️ Temperatura configurada (ideal: 3-5°C)
+            - 📦 Organização interna (não bloquear circulação de ar)
+            """)
+        elif metrics.get('daily_average_kwh', 0) < 0.8:
+            st.info("ℹ️ Consumo abaixo do esperado. Verifique se a geladeira está funcionando corretamente.")
+        else:
+            st.success("✅ Consumo dentro da faixa normal para geladeiras!")
+    
+    except Exception as e:
+        st.error(f"Erro ao carregar dados do SmartLife: {e}")
+else:
+    st.info("📧 Aguardando dados do SmartLife. Execute o polling para processar emails: `python scripts/gmail_polling.py`")
 
 # Seção de relatórios
 st.markdown("---")

@@ -1,0 +1,192 @@
+{
+  "dashboard": {
+    "title": "Casa Inteligente - SmartLife Monitor",
+    "tags": ["smartlife", "energia", "geladeira"],
+    "timezone": "browser",
+    "panels": [
+      {
+        "id": 1,
+        "title": "Consumo Diário (kWh)",
+        "type": "graph",
+        "targets": [
+          {
+            "expr": "smartlife_consumption_daily_kwh",
+            "legendFormat": "Consumo Diário"
+          }
+        ],
+        "gridPos": {
+          "h": 8,
+          "w": 12,
+          "x": 0,
+          "y": 0
+        }
+      },
+      {
+        "id": 2,
+        "title": "Projeção Mensal (kWh)",
+        "type": "graph",
+        "targets": [
+          {
+            "expr": "smartlife_consumption_monthly_projection_kwh",
+            "legendFormat": "Projeção Mensal"
+          }
+        ],
+        "gridPos": {
+          "h": 8,
+          "w": 12,
+          "x": 12,
+          "y": 0
+        }
+      },
+      {
+        "id": 3,
+        "title": "Custo Mensal Estimado (R$)",
+        "type": "stat",
+        "targets": [
+          {
+            "expr": "smartlife_cost_monthly_brl",
+            "legendFormat": "Custo Mensal"
+          }
+        ],
+        "gridPos": {
+          "h": 4,
+          "w": 6,
+          "x": 0,
+          "y": 8
+        },
+        "options": {
+          "graphMode": "area",
+          "colorMode": "value",
+          "unit": "currencyBRL"
+        }
+      },
+      {
+        "id": 4,
+        "title": "Status do Dispositivo",
+        "type": "stat",
+        "targets": [
+          {
+            "expr": "smartlife_status",
+            "legendFormat": "Status"
+          }
+        ],
+        "gridPos": {
+          "h": 4,
+          "w": 6,
+          "x": 6,
+          "y": 8
+        },
+        "options": {
+          "graphMode": "none",
+          "colorMode": "background",
+          "mappings": [
+            {
+              "type": "value",
+              "options": {
+                "0": {
+                  "text": "ALERT",
+                  "color": "red"
+                },
+                "1": {
+                  "text": "NORMAL",
+                  "color": "green"
+                }
+              }
+            }
+          ]
+        }
+      },
+      {
+        "id": 5,
+        "title": "Última Atualização",
+        "type": "stat",
+        "targets": [
+          {
+            "expr": "smartlife_last_update_timestamp",
+            "legendFormat": "Última Atualização"
+          }
+        ],
+        "gridPos": {
+          "h": 4,
+          "w": 12,
+          "x": 12,
+          "y": 8
+        },
+        "options": {
+          "graphMode": "none",
+          "unit": "dateTimeFromNow"
+        }
+      },
+      {
+        "id": 6,
+        "title": "Consumo vs. Faixa Normal",
+        "type": "bargauge",
+        "targets": [
+          {
+            "expr": "smartlife_consumption_daily_kwh",
+            "legendFormat": "Consumo Atual"
+          }
+        ],
+        "gridPos": {
+          "h": 8,
+          "w": 12,
+          "x": 0,
+          "y": 12
+        },
+        "options": {
+          "orientation": "horizontal",
+          "displayMode": "gradient",
+          "minVizWidth": 0,
+          "minVizHeight": 10,
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "value": 0,
+                "color": "blue"
+              },
+              {
+                "value": 0.8,
+                "color": "green"
+              },
+              {
+                "value": 2.5,
+                "color": "yellow"
+              },
+              {
+                "value": 3.0,
+                "color": "red"
+              }
+            ]
+          }
+        }
+      },
+      {
+        "id": 7,
+        "title": "Relatórios Processados",
+        "type": "stat",
+        "targets": [
+          {
+            "expr": "smartlife_reports_processed_total",
+            "legendFormat": "Total Processados"
+          }
+        ],
+        "gridPos": {
+          "h": 8,
+          "w": 12,
+          "x": 12,
+          "y": 12
+        },
+        "options": {
+          "graphMode": "area",
+          "colorMode": "value"
+        }
+      }
+    ],
+    "refresh": "30s",
+    "time": {
+      "from": "now-24h",
+      "to": "now"
+    }
+  }
+}

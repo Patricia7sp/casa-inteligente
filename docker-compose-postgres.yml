@@ -1,0 +1,39 @@
+version: '3.8'
+
+services:
+  postgres:
+    image: postgres:14
+    container_name: casa_inteligente_db
+    restart: always
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: casa_inteligente_2024
+      POSTGRES_DB: casa_inteligente
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./scripts/init-db.sql:/docker-entrypoint-initdb.d/init-db.sql
+    networks:
+      - casa_inteligente_network
+
+  pgadmin:
+    image: dpage/pgadmin4:latest
+    container_name: casa_inteligente_pgadmin
+    restart: always
+    environment:
+      PGADMIN_DEFAULT_EMAIL: admin@casa_inteligente.com
+      PGADMIN_DEFAULT_PASSWORD: admin_2024
+    ports:
+      - "8080:80"
+    depends_on:
+      - postgres
+    networks:
+      - casa_inteligente_network
+
+volumes:
+  postgres_data:
+
+networks:
+  casa_inteligente_network:
+    driver: bridge

@@ -17,6 +17,7 @@ O Casa Inteligente é um sistema completo que permite:
 ### ⚡ Monitoramento
 - Coleta automática de dados das tomadas inteligentes
 - Suporte para TP-Link TAPO e outras marcas
+- **Monitoramento via email** - Relatórios SmartLife (Geladeira Nova Digital)
 - Monitoramento em tempo real via API REST
 - Histórico completo de consumo
 
@@ -33,10 +34,11 @@ O Casa Inteligente é um sistema completo que permite:
 - Notificações do sistema
 
 ### 🎯 Dashboards
-- Interface web responsiva
+- Interface web responsiva (Streamlit)
 - Gráficos interativos com Grafana
 - Visualização em tempo real
 - Relatórios personalizáveis
+- **Dashboard SmartLife** - Geladeira Nova Digital com métricas de consumo
 
 ### 🤖 Assistente IA
 - Consultas em tempo real com LLM
@@ -48,7 +50,8 @@ O Casa Inteligente é um sistema completo que permite:
 
 - **Backend**: Python 3.10, FastAPI, SQLAlchemy
 - **Banco de Dados**: PostgreSQL, Redis
-- **Monitoramento**: Prometheus, Grafana
+- **Monitoramento**: Prometheus, Grafana, Streamlit
+- **Email Integration**: Gmail API, OAuth 2.0
 - **Containerização**: Docker, Docker Compose
 - **Deploy**: Google Cloud Run
 - **CI/CD**: GitHub Actions
@@ -137,6 +140,14 @@ COLLECTION_INTERVAL_MINUTES=15
 2. Configure `EMAIL_USERNAME` e `EMAIL_PASSWORD`
 3. Adicione destinatários em `EMAIL_RECIPIENTS`
 
+### Configurar Gmail API (SmartLife)
+1. Crie projeto no Google Cloud Console
+2. Ative Gmail API
+3. Configure OAuth 2.0 credentials
+4. Baixe credenciais para `config/gmail_credentials.json`
+5. Execute autenticação: `python src/integrations/gmail_client.py`
+6. Inicie polling: `python scripts/gmail_polling.py`
+
 ## 📡 Uso da API
 
 ### Endpoints Principais
@@ -178,16 +189,41 @@ curl -X POST http://localhost:8000/devices/1/control \
 
 ## 📊 Dashboards
 
+### Streamlit Dashboard
+Acesse `http://localhost:8501`
+```bash
+streamlit run dashboard.py
+```
+
+**Seções disponíveis:**
+- Dispositivos TAPO/TP-Link em tempo real
+- **Geladeira Nova Digital (SmartLife)** - Consumo, projeção e custos
+- Gráficos interativos e recomendações
+- Controle de dispositivos
+
 ### Grafana
 Acesse `http://localhost:3000`
 - Usuário: admin
 - Senha: admin
 
-### Dashboards disponíveis:
+**Dashboards disponíveis:**
 - Consumo em tempo real
 - Histórico diário/semanal/mensal
 - Comparação entre dispositivos
 - Alertas e anomalias
+- **SmartLife Dashboard** - Métricas da geladeira
+
+**Importar dashboard SmartLife:**
+```bash
+# Importar em Grafana: config/grafana_dashboard_smartlife.json
+```
+
+### Prometheus Metrics
+Acesse `http://localhost:9090/metrics`
+```bash
+# Iniciar exporter SmartLife
+python src/services/prometheus_exporter.py
+```
 
 ## 🚀 Deploy no Google Cloud
 
@@ -237,17 +273,30 @@ O projeto usa GitHub Actions para:
 casa_inteligente/
 ├── src/
 │   ├── agents/          # Agentes de monitoramento
+│   │   ├── collector.py           # Coleta de dados TAPO
+│   │   ├── energy_analyzer.py     # Análise de consumo
+│   │   └── weekly_energy_agent.py # Agente semanal SmartLife
 │   ├── api/            # Endpoints FastAPI
 │   ├── integrations/   # Clientes das APIs
+│   │   ├── tapo_client.py         # Cliente TAPO/TP-Link
+│   │   ├── gmail_client.py        # Cliente Gmail API
+│   │   └── smartlife_parser.py    # Parser relatórios SmartLife
 │   ├── models/         # Models de dados
 │   ├── services/       # Lógica de negócio
+│   │   └── prometheus_exporter.py # Exporter Prometheus
 │   ├── utils/          # Utilitários
 │   └── main.py         # Aplicação principal
 ├── tests/              # Testes automatizados
-├── docker/             # Configurações Docker
-├── scripts/            # Scripts de deploy
+├── scripts/            # Scripts utilitários
+│   ├── gmail_polling.py           # Polling emails SmartLife
+│   └── add_my_devices.py          # Adicionar dispositivos
 ├── config/             # Configurações
+│   ├── prometheus.yml             # Config Prometheus
+│   └── grafana_dashboard_smartlife.json  # Dashboard Grafana
+├── data/               # Dados de runtime
+│   └── smartlife/                 # Dados SmartLife
 ├── docs/               # Documentação
+├── dashboard.py        # Dashboard Streamlit
 └── .github/workflows/  # CI/CD
 ```
 
@@ -271,12 +320,52 @@ Este projeto está licenciado sob a MIT License - veja o arquivo [LICENSE](LICEN
 
 ## 🎯 Roadmap
 
+- [x] Suporte para TP-Link TAPO
+- [x] Integração com SmartLife via email
+- [x] Dashboard Streamlit interativo
+- [x] Monitoramento Prometheus/Grafana
+- [x] Gmail API para relatórios automáticos
 - [ ] Suporte para mais marcas de tomadas
 - [ ] Aplicativo mobile
 - [ ] Integração com assistentes de voz
 - [ ] Análise preditiva avançada
 - [ ] Dashboard público compartilhável
 - [ ] Integração com sistemas de energia solar
+
+## 📧 SmartLife Email Integration
+
+O sistema monitora automaticamente emails do SmartLife (Geladeira Nova Digital) e processa relatórios de consumo.
+
+### Como funciona:
+1. **Polling automático** verifica Gmail a cada 5 minutos
+2. **Detecta novos relatórios** SmartLife
+3. **Baixa e processa** dados de consumo
+4. **Salva métricas** em JSON e Prometheus
+5. **Atualiza dashboards** automaticamente
+
+### Executar sistema completo:
+```bash
+# 1. Polling de emails (background)
+python scripts/gmail_polling.py &
+
+# 2. Prometheus exporter (background)
+python src/services/prometheus_exporter.py &
+
+# 3. Dashboard Streamlit
+streamlit run dashboard.py
+```
+
+### Métricas disponíveis:
+- Consumo diário (kWh)
+- Projeção mensal (kWh)
+- Custo estimado (R$)
+- Status (normal/alert)
+- Alertas inteligentes
+
+### Arquivos importantes:
+- `data/smartlife/latest.json` - Dados mais recentes
+- `config/gmail_credentials.json` - Credenciais OAuth
+- `config/gmail_token.pickle` - Token de autenticação
 
 ---
 
