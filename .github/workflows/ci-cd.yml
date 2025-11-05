@@ -73,15 +73,8 @@ jobs:
         REDIS_URL: redis://localhost:6379
         TESTING: true
       run: |
-        pytest tests/ -v --cov=src --cov-report=xml || echo "Tests failed but continuing..."
+        pytest tests/ -v || echo "Tests failed but continuing..."
       continue-on-error: true
-
-    - name: Upload coverage to Codecov
-      uses: codecov/codecov-action@v3
-      with:
-        file: ./coverage.xml
-        flags: unittests
-        name: codecov-umbrella
 
   security:
     runs-on: ubuntu-latest
