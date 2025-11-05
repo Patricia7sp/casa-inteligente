@@ -728,7 +728,7 @@ async def discover_local_devices():
 if __name__ == "__main__":
     uvicorn.run(
         "src.main:app",
-        host="0.0.0.0",
+        host="0.0.0.0",  # nosec B104 - Bind all interfaces is intentional for container deployment
         port=8000,
         reload=settings.debug,
         log_level="info",

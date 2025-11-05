@@ -12,61 +12,62 @@ def setup_tinytuya_wizard():
     """Configurar tinytuya wizard automaticamente"""
     print("🧙 CONFIGURANDO TINYTUYA WIZARD")
     print("=" * 60)
-    
+
     # Credenciais Cloud
     api_id = "nwykv3tnwx5na9kvyjvu"
     api_secret = "021747b14008401f9f173dc693113aef"
     region = "us"
     device_id = "eb0254d3ac39b4d2740fwq"
-    
+
     print("📋 Credenciais Cloud:")
     print(f"   API ID: {api_id}")
     print(f"   API Secret: {api_secret[:10]}...")
     print(f"   Region: {region}")
     print(f"   Device ID: {device_id}")
     print()
-    
+
     print("🔄 Executando wizard...")
     print("   (Isso pode levar alguns minutos)")
     print()
-    
+
     # Preparar input para o wizard
     wizard_input = f"{api_id}\n{api_secret}\n{region}\n"
-    
+
     try:
         # Executar wizard
         result = subprocess.run(
-            ['python', '-m', 'tinytuya', 'wizard'],
+            ["python", "-m", "tinytuya", "wizard"],
             input=wizard_input,
             capture_output=True,
             text=True,
-            timeout=120
+            timeout=120,
         )
-        
+
         print(result.stdout)
-        
+
         if result.returncode == 0:
             print("\n✅ Wizard concluído!")
-            
+
             # Verificar se criou arquivo de dispositivos
-            devices_file = Path('devices.json')
+            devices_file = Path("devices.json")
             if devices_file.exists():
                 print(f"✅ Arquivo devices.json criado!")
-                
+
                 import json
-                with open(devices_file, 'r') as f:
+
+                with open(devices_file, "r") as f:
                     devices = json.load(f)
-                
+
                 print(f"\n📱 Dispositivos encontrados: {len(devices)}")
-                
+
                 for device in devices:
                     print(f"\n   📱 {device.get('name', 'Unknown')}")
                     print(f"      ID: {device.get('id')}")
                     print(f"      IP: {device.get('ip')}")
                     print(f"      Key: {device.get('key', 'N/A')}")
-                    
-                    if device.get('id') == device_id:
-                        local_key = device.get('key')
+
+                    if device.get("id") == device_id:
+                        local_key = device.get("key")
                         if local_key:
                             print(f"\n🎉 LOCAL KEY ENCONTRADA!")
                             print(f"✅ Key: {local_key}")
@@ -76,12 +77,12 @@ def setup_tinytuya_wizard():
         else:
             print(f"\n❌ Erro no wizard:")
             print(result.stderr)
-    
+
     except subprocess.TimeoutExpired:
         print(f"❌ Wizard timeout (120s)")
     except Exception as e:
         print(f"❌ Erro: {e}")
-    
+
     return None
 
 
@@ -89,9 +90,9 @@ def main():
     """Função principal"""
     print("🎯 TINYTUYA WIZARD AUTOMÁTICO")
     print("=" * 60)
-    
+
     local_key = setup_tinytuya_wizard()
-    
+
     if local_key:
         print(f"\n🎉 SUCESSO!")
         print(f"✅ Local Key: {local_key}")

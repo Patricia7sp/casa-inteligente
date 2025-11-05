@@ -12,11 +12,11 @@ from datetime import datetime
 
 class TuyaGoogleAccountHelper:
     """Helper para contas Tuya com login Google"""
-    
+
     def __init__(self):
         self.device_id = "eb0254d3ac39b4d2740fwq"
         self.device_ip = "192.168.68.100"
-    
+
     def solution_1_create_traditional_account(self):
         """Solução 1: Criar conta tradicional e transferir dispositivo"""
         print("🔐 SOLUÇÃO 1: CRIAR CONTA TRADICIONAL")
@@ -39,7 +39,7 @@ class TuyaGoogleAccountHelper:
         print()
         print("✅ Isso permite acesso à plataforma IoT!")
         print()
-    
+
     def solution_2_share_device(self):
         """Solução 2: Compartilhar dispositivo com outra conta"""
         print("👥 SOLUÇÃO 2: COMPARTILHAR DISPOSITIVO")
@@ -64,7 +64,7 @@ class TuyaGoogleAccountHelper:
         print("   c) Dispositivo aparecerá compartilhado")
         print("   d) Copie a Local Key")
         print()
-    
+
     def solution_3_api_with_google_token(self):
         """Solução 3: Usar API com token Google"""
         print("🔑 SOLUÇÃO 3: API COM TOKEN GOOGLE")
@@ -82,7 +82,7 @@ class TuyaGoogleAccountHelper:
         print("2️⃣ USAR TOKEN NA API:")
         print("   Execute: python scripts/api_with_google_token.py")
         print()
-    
+
     def solution_4_reset_and_reconfigure(self):
         """Solução 4: Resetar dispositivo e reconfigurar"""
         print("🔄 SOLUÇÃO 4: RESETAR E RECONFIGURAR")
@@ -112,7 +112,7 @@ class TuyaGoogleAccountHelper:
         print()
         print("⚠️ ATENÇÃO: Você perderá automações configuradas!")
         print()
-    
+
     def solution_5_contact_support(self):
         """Solução 5: Contatar suporte Tuya"""
         print("📞 SOLUÇÃO 5: SUPORTE TUYA")
@@ -134,7 +134,7 @@ class TuyaGoogleAccountHelper:
         print("   - Local Key do dispositivo")
         print("   - Ou instruções para vincular email")
         print()
-    
+
     def solution_6_alternative_firmware(self):
         """Solução 6: Firmware alternativo"""
         print("⚡ SOLUÇÃO 6: FIRMWARE ALTERNATIVO")
@@ -162,7 +162,7 @@ class TuyaGoogleAccountHelper:
         print("   - https://tasmota.github.io/")
         print("   - https://esphome.io/")
         print()
-    
+
     def show_all_solutions(self):
         """Mostrar todas as soluções"""
         print("🎯 SOLUÇÕES PARA CONTA GOOGLE OAUTH")
@@ -173,16 +173,52 @@ class TuyaGoogleAccountHelper:
         print()
         print("Aqui estão TODAS as soluções possíveis:")
         print()
-        
+
         solutions = [
-            ("VINCULAR EMAIL", self.solution_1_create_traditional_account, "⭐⭐⭐⭐⭐", "5 min", "Fácil"),
-            ("COMPARTILHAR DISPOSITIVO", self.solution_2_share_device, "⭐⭐⭐⭐", "10 min", "Fácil"),
-            ("API COM TOKEN", self.solution_3_api_with_google_token, "⭐⭐⭐", "30 min", "Média"),
-            ("RESETAR E RECONFIGURAR", self.solution_4_reset_and_reconfigure, "⭐⭐⭐⭐", "15 min", "Fácil"),
-            ("CONTATAR SUPORTE", self.solution_5_contact_support, "⭐⭐", "1-3 dias", "Fácil"),
-            ("FIRMWARE ALTERNATIVO", self.solution_6_alternative_firmware, "⭐⭐", "2-4 horas", "Difícil")
+            (
+                "VINCULAR EMAIL",
+                self.solution_1_create_traditional_account,
+                "⭐⭐⭐⭐⭐",
+                "5 min",
+                "Fácil",
+            ),
+            (
+                "COMPARTILHAR DISPOSITIVO",
+                self.solution_2_share_device,
+                "⭐⭐⭐⭐",
+                "10 min",
+                "Fácil",
+            ),
+            (
+                "API COM TOKEN",
+                self.solution_3_api_with_google_token,
+                "⭐⭐⭐",
+                "30 min",
+                "Média",
+            ),
+            (
+                "RESETAR E RECONFIGURAR",
+                self.solution_4_reset_and_reconfigure,
+                "⭐⭐⭐⭐",
+                "15 min",
+                "Fácil",
+            ),
+            (
+                "CONTATAR SUPORTE",
+                self.solution_5_contact_support,
+                "⭐⭐",
+                "1-3 dias",
+                "Fácil",
+            ),
+            (
+                "FIRMWARE ALTERNATIVO",
+                self.solution_6_alternative_firmware,
+                "⭐⭐",
+                "2-4 horas",
+                "Difícil",
+            ),
         ]
-        
+
         print("📊 COMPARAÇÃO:")
         print()
         for i, (name, _, rating, time, difficulty) in enumerate(solutions, 1):
@@ -191,10 +227,10 @@ class TuyaGoogleAccountHelper:
             print(f"   Tempo: {time}")
             print(f"   Dificuldade: {difficulty}")
             print()
-        
+
         print("=" * 60)
         print()
-        
+
         # Executar cada solução
         for i, (name, func, _, _, _) in enumerate(solutions, 1):
             print(f"\n{'='*60}")
@@ -339,26 +375,26 @@ python scripts/monitor_novadigital_final.py
 
 **Você está muito perto! Escolha uma solução e execute!** 🎯
 """
-    
-    with open('GUIA_CONTA_GOOGLE_OAUTH.md', 'w') as f:
+
+    with open("GUIA_CONTA_GOOGLE_OAUTH.md", "w") as f:
         f.write(guide)
-    
+
     print("✅ Guia criado: GUIA_CONTA_GOOGLE_OAUTH.md")
 
 
 def main():
     """Função principal"""
     helper = TuyaGoogleAccountHelper()
-    
+
     print("\n🎯 PROBLEMA IDENTIFICADO:")
     print("=" * 60)
     print("✅ Conta criada com Google OAuth")
     print("❌ IoT Platform não aceita login Google")
     print("❌ Não consegue acessar Local Key")
     print()
-    
+
     helper.show_all_solutions()
-    
+
     print("\n" + "=" * 60)
     print("📋 RECOMENDAÇÃO:")
     print("=" * 60)
@@ -373,10 +409,10 @@ def main():
     print("   - Perde automações")
     print("   - Conta nova com email/senha")
     print()
-    
+
     # Criar guia
     create_step_by_step_guide()
-    
+
     print("\n✅ Guia detalhado criado!")
     print("📁 Arquivo: GUIA_CONTA_GOOGLE_OAUTH.md")
 
