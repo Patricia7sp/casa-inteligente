@@ -45,10 +45,10 @@ pydantic==2.5.0
 pydantic-settings==2.1.0
 
 # Testes
-pytest==7.4.3
-pytest-asyncio==0.21.1
+pytest==8.0.0
+pytest-asyncio==0.23.3
 pytest-cov==4.1.0
-httpx==0.25.2
+httpx==0.26.0
 
 # Deploy e Docker
 gunicorn==21.2.0
