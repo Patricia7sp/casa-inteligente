@@ -1,0 +1,9 @@
+{
+  "timestamp": "2025-11-04T00:30:42.375683",
+  "ip": "192.168.68.100",
+  "device_id": "eb0254d3ac39b4d2740fwq",
+  "open_ports": [
+    6668
+  ],
+  "broadcast_discovery": null
+}

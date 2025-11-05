@@ -20,7 +20,7 @@ logger = logging.getLogger(__name__)
 
 class NotificationService:
     """Serviço responsável por enviar notificações"""
-    
+
     def __init__(self):
         self.telegram_bot = None
         if settings.telegram_bot_token:
@@ -29,8 +29,10 @@ class NotificationService:
                 logger.info("Bot Telegram inicializado com sucesso")
             except Exception as e:
                 logger.error(f"Erro ao inicializar bot Telegram: {str(e)}")
-    
-    async def send_telegram_message(self, message: str, parse_mode: str = "Markdown") -> bool:
+
+    async def send_telegram_message(
+        self, message: str, parse_mode: str = "Markdown"
+    ) -> bool:
         """
         Enviar mensagem via Telegram
         
@@ -44,23 +46,21 @@ class NotificationService:
         if not self.telegram_bot or not settings.telegram_chat_id:
             logger.warning("Bot Telegram não configurado")
             return False
-        
+
         try:
             await self.telegram_bot.send_message(
-                chat_id=settings.telegram_chat_id,
-                text=message,
-                parse_mode=parse_mode
+                chat_id=settings.telegram_chat_id, text=message, parse_mode=parse_mode
             )
             logger.info("Mensagem Telegram enviada com sucesso")
             return True
-            
+
         except TelegramError as e:
             logger.error(f"Erro ao enviar mensagem Telegram: {str(e)}")
             return False
         except Exception as e:
             logger.error(f"Erro inesperado ao enviar mensagem Telegram: {str(e)}")
             return False
-    
+
     def send_email(self, subject: str, body: str, is_html: bool = False) -> bool:
         """
         Enviar email
@@ -76,40 +76,42 @@ class NotificationService:
         if not settings.email_username or not settings.email_password:
             logger.warning("Email não configurado")
             return False
-        
+
         if not settings.email_recipients:
             logger.warning("Nenhum destinatário de email configurado")
             return False
-        
+
         try:
             # Criar mensagem
             msg = MIMEMultipart()
-            msg['From'] = settings.email_username
-            msg['To'] = ", ".join(settings.email_recipients)
-            msg['Subject'] = subject
-            
+            msg["From"] = settings.email_username
+            msg["To"] = ", ".join(settings.email_recipients)
+            msg["Subject"] = subject
+
             # Adicionar corpo
             if is_html:
-                msg.attach(MIMEText(body, 'html'))
+                msg.attach(MIMEText(body, "html"))
             else:
-                msg.attach(MIMEText(body, 'plain'))
-            
+                msg.attach(MIMEText(body, "plain"))
+
             # Conectar e enviar
             server = smtplib.SMTP(settings.email_smtp_server, settings.email_smtp_port)
             server.starttls()
             server.login(settings.email_username, settings.email_password)
-            
+
             text = msg.as_string()
             server.sendmail(settings.email_username, settings.email_recipients, text)
             server.quit()
-            
-            logger.info(f"Email enviado com sucesso para {len(settings.email_recipients)} destinatários")
+
+            logger.info(
+                f"Email enviado com sucesso para {len(settings.email_recipients)} destinatários"
+            )
             return True
-            
+
         except Exception as e:
             logger.error(f"Erro ao enviar email: {str(e)}")
             return False
-    
+
     async def send_daily_report(self, report_data: Dict) -> bool:
         """
         Enviar relatório diário
@@ -132,11 +134,11 @@ class NotificationService:
 
 📊 *Dispositivos:*
 """
-            
-            for device in report_data['devices']:
-                status_emoji = "🟢" if device['average_power_watts'] > 0 else "🔴"
-                anomaly_emoji = "⚠️" if device.get('anomaly') else ""
-                
+
+            for device in report_data["devices"]:
+                status_emoji = "🟢" if device["average_power_watts"] > 0 else "🔴"
+                anomaly_emoji = "⚠️" if device.get("anomaly") else ""
+
                 telegram_message += f"""
 {status_emoji} *{device['device_name']}* ({device['location']})
 • Equipamento: {device['equipment']}
@@ -145,25 +147,25 @@ class NotificationService:
 • Média: {device['average_power_watts']:.1f}W
 • Pico: {device['peak_power_watts']:.1f}W {anomaly_emoji}
 """
-            
-            if report_data['anomalies']:
+
+            if report_data["anomalies"]:
                 telegram_message += f"""
 ⚠️ *Anomalias Detectadas:*
 """
-                for anomaly in report_data['anomalies']:
+                for anomaly in report_data["anomalies"]:
                     telegram_message += f"• {anomaly['description']}\n"
-            
+
             telegram_message += f"""
 🔋 *Dica do Dia:* Monitore equipamentos com consumo acima da média para identificar possíveis problemas!
 
 _Casa Inteligente - Seu assistente de energia_"""
-            
+
             # Enviar Telegram
             telegram_success = await self.send_telegram_message(telegram_message)
-            
+
             # Formatar email
             email_subject = f"Relatório Diário de Consumo - {report_data['date'].strftime('%d/%m/%Y')}"
-            
+
             email_body = f"""
 <html>
 <body>
@@ -189,11 +191,17 @@ _Casa Inteligente - Seu assistente de energia_"""
             <th><strong>Pico (W)</strong></th>
         </tr>
 """
-            
-            for device in report_data['devices']:
-                status_color = "#90EE90" if device['average_power_watts'] > 0 else "#FFB6C1"
-                anomaly_note = f"<br><small>⚠️ {device.get('anomaly', {}).get('description', '')}</small>" if device.get('anomaly') else ""
-                
+
+            for device in report_data["devices"]:
+                status_color = (
+                    "#90EE90" if device["average_power_watts"] > 0 else "#FFB6C1"
+                )
+                anomaly_note = (
+                    f"<br><small>⚠️ {device.get('anomaly', {}).get('description', '')}</small>"
+                    if device.get("anomaly")
+                    else ""
+                )
+
                 email_body += f"""
         <tr style="background-color: {status_color};">
             <td>{device['device_name']}</td>
@@ -205,7 +213,7 @@ _Casa Inteligente - Seu assistente de energia_"""
             <td>{device['peak_power_watts']:.1f}{anomaly_note}</td>
         </tr>
 """
-            
+
             email_body += """
     </table>
     
@@ -216,17 +224,19 @@ _Casa Inteligente - Seu assistente de energia_"""
 </body>
 </html>
 """
-            
+
             # Enviar Email
             email_success = self.send_email(email_subject, email_body, is_html=True)
-            
-            logger.info(f"Relatório diário enviado - Telegram: {telegram_success}, Email: {email_success}")
+
+            logger.info(
+                f"Relatório diário enviado - Telegram: {telegram_success}, Email: {email_success}"
+            )
             return telegram_success or email_success
-            
+
         except Exception as e:
             logger.error(f"Erro ao enviar relatório diário: {str(e)}")
             return False
-    
+
     async def send_alert(self, alert_data: Dict) -> bool:
         """
         Enviar alerta de anomalia
@@ -255,21 +265,25 @@ _Casa Inteligente - Seu assistente de energia_"""
 _Verifique o dispositivo e tome as ações necessárias!_
 
 _Casa Inteligente - Monitoramento 24/7_"""
-            
+
             # Enviar Telegram
             telegram_success = await self.send_telegram_message(alert_message)
-            
+
             # Enviar Email
             email_subject = f"🚨 Alerta de Consumo Anômalo - {alert_data.get('device_name', 'Dispositivo')}"
-            email_success = self.send_email(email_subject, alert_message.replace('*', '').replace('_', ''))
-            
-            logger.info(f"Alerta enviado - Telegram: {telegram_success}, Email: {email_success}")
+            email_success = self.send_email(
+                email_subject, alert_message.replace("*", "").replace("_", "")
+            )
+
+            logger.info(
+                f"Alerta enviado - Telegram: {telegram_success}, Email: {email_success}"
+            )
             return telegram_success or email_success
-            
+
         except Exception as e:
             logger.error(f"Erro ao enviar alerta: {str(e)}")
             return False
-    
+
     async def send_system_notification(self, message: str, level: str = "INFO") -> bool:
         """
         Enviar notificação do sistema
@@ -282,12 +296,8 @@ _Casa Inteligente - Monitoramento 24/7_"""
             bool: True se enviado com sucesso
         """
         try:
-            level_emoji = {
-                "INFO": "ℹ️",
-                "WARNING": "⚠️",
-                "ERROR": "❌"
-            }.get(level, "ℹ️")
-            
+            level_emoji = {"INFO": "ℹ️", "WARNING": "⚠️", "ERROR": "❌"}.get(level, "ℹ️")
+
             system_message = f"""{level_emoji} *Notificação do Sistema - Casa Inteligente*
 
 {message}
@@ -295,13 +305,13 @@ _Casa Inteligente - Monitoramento 24/7_"""
 ⏰ *Horário:* {datetime.utcnow().strftime('%d/%m/%Y %H:%M:%S')}
 
 _Casa Inteligente - Sistema de Monitoramento_"""
-            
+
             return await self.send_telegram_message(system_message)
-            
+
         except Exception as e:
             logger.error(f"Erro ao enviar notificação do sistema: {str(e)}")
             return False
-    
+
     def test_notifications(self) -> Dict[str, bool]:
         """
         Testar configurações de notificação
@@ -310,7 +320,7 @@ _Casa Inteligente - Sistema de Monitoramento_"""
             Dict com resultados dos testes
         """
         results = {}
-        
+
         # Testar Telegram
         if self.telegram_bot:
             try:
@@ -318,7 +328,9 @@ _Casa Inteligente - Sistema de Monitoramento_"""
                 loop = asyncio.new_event_loop()
                 asyncio.set_event_loop(loop)
                 results["telegram"] = loop.run_until_complete(
-                    self.send_telegram_message("🧪 Teste de notificação - Casa Inteligente")
+                    self.send_telegram_message(
+                        "🧪 Teste de notificação - Casa Inteligente"
+                    )
                 )
                 loop.close()
             except Exception as e:
@@ -326,13 +338,13 @@ _Casa Inteligente - Sistema de Monitoramento_"""
                 results["telegram"] = False
         else:
             results["telegram"] = False
-        
+
         # Testar Email
         results["email"] = self.send_email(
             "🧪 Teste de Notificação - Casa Inteligente",
-            "Este é um email de teste do sistema Casa Inteligente.\n\nSe você recebeu este email, as configurações estão corretas!"
+            "Este é um email de teste do sistema Casa Inteligente.\n\nSe você recebeu este email, as configurações estão corretas!",
         )
-        
+
         logger.info(f"Testes de notificação concluídos: {results}")
         return results
 

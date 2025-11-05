@@ -1,0 +1,21 @@
+{
+    "timestamp": 1762223002.5286899,
+    "devices": [
+        {
+            "id": "eb0254d3ac39b4d2740fwq",
+            "ip": "192.168.68.100",
+            "active": 2,
+            "encrypt": true,
+            "productKey": "keyjup78v54myhan",
+            "token": true,
+            "wf_cfg": true,
+            "name": "",
+            "key": "",
+            "mac": "",
+            "ability": 0,
+            "dev_type": "default",
+            "origin": "broadcast",
+            "ver": "3.4"
+        }
+    ]
+}
