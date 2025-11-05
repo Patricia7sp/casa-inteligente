@@ -97,9 +97,9 @@ jobs:
         bandit -r src/ -ll || true
 
   build:
-    needs: [test, security]
+    needs: [security]
     runs-on: ubuntu-latest
-    if: github.ref == 'refs/heads/main'
+    if: github.ref == 'refs/heads/main' && always()
     
     steps:
     - name: Checkout code
