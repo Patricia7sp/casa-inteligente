@@ -2,6 +2,7 @@
 Dashboard Streamlit para Casa Inteligente
 """
 
+import os
 import streamlit as st
 import requests
 import pandas as pd
@@ -21,7 +22,7 @@ st.set_page_config(
 )
 
 # Configuração da API
-API_BASE_URL = "http://localhost:8000"
+API_BASE_URL = os.getenv("API_BASE_URL", "http://localhost:8000")
 
 # Título da aplicação
 st.title("🏠 Casa Inteligente Dashboard")
