@@ -12,6 +12,9 @@ env:
   REPOSITORY: casa-inteligente
   SERVICE_NAME: casa-inteligente
 
+permissions:
+  contents: write
+
 jobs:
   test:
     runs-on: ubuntu-latest
