@@ -3,8 +3,8 @@ FROM prom/prometheus:v2.53.0
 
 USER root
 
-COPY prometheus.yml.template /etc/prometheus/prometheus.yml.template
-COPY entrypoint.sh /entrypoint.sh
+COPY docker/prometheus/prometheus.yml.template /etc/prometheus/prometheus.yml.template
+COPY docker/prometheus/entrypoint.sh /entrypoint.sh
 
 RUN chmod +x /entrypoint.sh
 
