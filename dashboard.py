@@ -5,6 +5,7 @@ Dashboard Streamlit para Casa Inteligente
 import os
 import json
 import time
+import math
 from pathlib import Path
 from datetime import datetime, timedelta
 
@@ -23,10 +24,17 @@ st.set_page_config(
 )
 
 # CSS customizado para tema escuro elegante
-st.markdown("""
+st.markdown(
+    """
 <style>
     .stApp {
         background: linear-gradient(135deg, #0f0c29 0%, #302b63 50%, #24243e 100%);
+        background-image: 
+            url('https://images.unsplash.com/photo-1451187580459-43490279c0fa?w=1920&q=80'),
+            linear-gradient(135deg, rgba(15,12,41,0.95) 0%, rgba(48,43,99,0.95) 50%, rgba(36,36,62,0.95) 100%);
+        background-blend-mode: overlay;
+        background-size: cover;
+        background-attachment: fixed;
     }
     .stMetric {
         background: rgba(255, 255, 255, 0.05);
@@ -70,13 +78,16 @@ st.markdown("""
         border-radius: 10px;
     }
 </style>
-""", unsafe_allow_html=True)
+""",
+    unsafe_allow_html=True,
+)
 
 # Configuração da API
 API_BASE_URL = os.getenv("API_BASE_URL", "http://localhost:8000")
 
 # Título da aplicação
-st.markdown("""
+st.markdown(
+    """
 <div style='text-align: center; padding: 20px;'>
     <h1 style='font-size: 3rem; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); 
                -webkit-background-clip: text; -webkit-text-fill-color: transparent; 
@@ -85,7 +96,9 @@ st.markdown("""
     </h1>
     <p style='color: #a0aec0; font-size: 1.1rem;'>Monitoramento Inteligente de Energia</p>
 </div>
-""", unsafe_allow_html=True)
+""",
+    unsafe_allow_html=True,
+)
 
 # Sidebar com informações e controles
 st.sidebar.markdown("## 📊 Controles")
@@ -95,9 +108,16 @@ auto_refresh = st.sidebar.checkbox("Auto Refresh (10s)", value=True)
 refresh_interval = 10 if auto_refresh else 0
 
 # Seletor de período
-time_range = st.sidebar.selectbox(
-    "Período de Análise", ["Últimas 24h", "Últimos 7 dias", "Últimos 30 dias"], index=0
+time_range_options = {
+    "Últimas 24h": 1,
+    "Últimos 7 dias": 7,
+    "Últimos 30 dias": 30,
+    "Últimos 90 dias": 90,
+}
+time_range_label = st.sidebar.selectbox(
+    "Período de Análise", list(time_range_options.keys()), index=2
 )
+time_range_days = time_range_options[time_range_label]
 
 
 # Funções utilitárias
@@ -132,6 +152,7 @@ def format_cost(value):
     """Formatar valor de custo"""
     return f"R$ {value:.2f}"
 
+
 def load_smartlife_data() -> dict:
     smartlife_file = Path("data/smartlife/latest.json")
     if smartlife_file.exists():
@@ -143,9 +164,7 @@ def load_smartlife_data() -> dict:
     return {}
 
 
-def calculate_tariff_values(
-    energy_kwh: float, tariff_per_kwh: float = 0.862
-) -> float:
+def calculate_tariff_values(energy_kwh: float, tariff_per_kwh: float = 0.862) -> float:
     return round(energy_kwh * tariff_per_kwh, 2)
 
 
@@ -179,10 +198,14 @@ def build_summary_cards_tapo(realtime_data: dict):
 
 def render_tapo_dashboard(realtime_data: dict):
     if not realtime_data or "devices" not in realtime_data:
-        st.warning("⚠️ Sem dados recentes dos dispositivos Tapo. Verifique a conexão com a API.")
+        st.warning(
+            "⚠️ Sem dados recentes dos dispositivos Tapo. Verifique a conexão com a API."
+        )
         with st.expander("🔍 Diagnóstico"):
             st.code(f"API URL: {API_BASE_URL}/status/realtime")
-            st.info("Certifique-se de que a API está rodando e o banco de dados está acessível.")
+            st.info(
+                "Certifique-se de que a API está rodando e o banco de dados está acessível."
+            )
         return
 
     devices_df = pd.DataFrame(realtime_data["devices"])
@@ -191,21 +214,26 @@ def render_tapo_dashboard(realtime_data: dict):
         return
 
     build_summary_cards_tapo(realtime_data)
-    
+
     # Adicionar gráficos históricos
     st.markdown("### 📊 Histórico de Consumo")
-    
+
     if len(devices_df) > 0:
         selected_device_id = st.selectbox(
             "Selecione um dispositivo para ver histórico",
             options=devices_df["device_id"].tolist(),
-            format_func=lambda x: devices_df[devices_df["device_id"] == x]["device_name"].iloc[0]
+            format_func=lambda x: devices_df[devices_df["device_id"] == x][
+                "device_name"
+            ].iloc[0],
         )
-        
+
         col1, col2 = st.columns(2)
-        
+
         with col1:
-            weekly_data = get_api_data(f"/devices/{selected_device_id}/weekly?weeks=2")
+            weeks = max(1, math.ceil(time_range_days / 7))
+            weekly_data = get_api_data(
+                f"/devices/{selected_device_id}/weekly?weeks={weeks}"
+            )
             if weekly_data and "data" in weekly_data:
                 df_week = pd.DataFrame(weekly_data["data"])
                 fig_week = px.line(
@@ -214,25 +242,32 @@ def render_tapo_dashboard(realtime_data: dict):
                     y="consumption_kwh",
                     title="Consumo Semanal (kWh)",
                     markers=True,
-                    color_discrete_sequence=["#667eea"]
+                    color_discrete_sequence=["#667eea"],
                 )
                 fig_week.update_layout(
                     plot_bgcolor="rgba(0,0,0,0)",
                     paper_bgcolor="rgba(0,0,0,0)",
-                    font_color="#ffffff"
+                    font_color="#ffffff",
                 )
                 st.plotly_chart(fig_week, use_container_width=True)
-        
+
         with col2:
             monthly_data = get_api_data(f"/devices/{selected_device_id}/monthly")
             if monthly_data:
-                st.metric("💰 Custo Mensal", f"R$ {monthly_data.get('total_cost_brl', 0):.2f}")
-                st.metric("⚡ Consumo Mensal", f"{monthly_data.get('total_energy_kwh', 0):.2f} kWh")
-                st.metric("⏱️ Tempo de Uso", f"{monthly_data.get('runtime_hours', 0):.1f} h")
-    
+                st.metric(
+                    "💰 Custo Mensal", f"R$ {monthly_data.get('total_cost_brl', 0):.2f}"
+                )
+                st.metric(
+                    "⚡ Consumo Mensal",
+                    f"{monthly_data.get('total_energy_kwh', 0):.2f} kWh",
+                )
+                st.metric(
+                    "⏱️ Tempo de Uso", f"{monthly_data.get('runtime_hours', 0):.1f} h"
+                )
+
     # Ranking de dispositivos
-    st.markdown("### 🏆 Ranking de Consumo (Últimos 30 dias)")
-    ranking_data = get_api_data("/devices/ranking?period_days=30")
+    st.markdown(f"### 🏆 Ranking de Consumo ({time_range_label})")
+    ranking_data = get_api_data(f"/devices/ranking?period_days={time_range_days}")
     if ranking_data and "ranking" in ranking_data:
         df_rank = pd.DataFrame(ranking_data["ranking"])
         fig_rank = px.bar(
@@ -241,12 +276,12 @@ def render_tapo_dashboard(realtime_data: dict):
             y="consumption_kwh",
             color="cost_brl",
             title="Consumo por Dispositivo",
-            color_continuous_scale="Viridis"
+            color_continuous_scale="Viridis",
         )
         fig_rank.update_layout(
             plot_bgcolor="rgba(0,0,0,0)",
             paper_bgcolor="rgba(0,0,0,0)",
-            font_color="#ffffff"
+            font_color="#ffffff",
         )
         st.plotly_chart(fig_rank, use_container_width=True)
 
@@ -302,27 +337,30 @@ def render_tapo_dashboard(realtime_data: dict):
                 "Diário (kWh)": energy_daily,
                 "Semanal (kWh)": energy_week,
                 "Mensal (kWh)": energy_month,
-                "Custo Mensal (R$)": calculate_tariff_values(
-                    energy_month, tariff
-                ),
+                "Custo Mensal (R$)": calculate_tariff_values(energy_month, tariff),
             }
         )
 
     st.markdown("### 📈 Projeções de Consumo e Custo")
     projections_df = pd.DataFrame(energy_estimates)
-    st.dataframe(projections_df.style.format({
-        "Diário (kWh)": "{:.2f}",
-        "Semanal (kWh)": "{:.2f}",
-        "Mensal (kWh)": "{:.2f}",
-        "Custo Mensal (R$)": "R$ {:.2f}",
-    }), use_container_width=True)
+    st.dataframe(
+        projections_df.style.format(
+            {
+                "Diário (kWh)": "{:.2f}",
+                "Semanal (kWh)": "{:.2f}",
+                "Mensal (kWh)": "{:.2f}",
+                "Custo Mensal (R$)": "R$ {:.2f}",
+            }
+        ),
+        use_container_width=True,
+    )
 
     with st.expander("⚠️ Picos e Outliers"):
-        avg_consumption = devices_df["Consumo Atual (W)"] .mean()
-        std_consumption = devices_df["Consumo Atual (W)"] .std()
+        avg_consumption = devices_df["Consumo Atual (W)"].mean()
+        std_consumption = devices_df["Consumo Atual (W)"].std()
         threshold = avg_consumption + (std_consumption * 2 if std_consumption else 0)
         outliers = devices_df[
-            devices_df["Consumo Atual (W)"]  > max(threshold, avg_consumption * 1.5)
+            devices_df["Consumo Atual (W)"] > max(threshold, avg_consumption * 1.5)
         ]
         if not outliers.empty:
             for _, row in outliers.iterrows():
@@ -345,8 +383,13 @@ def render_smartlife_dashboard(smartlife_data: dict):
     st.markdown("### 🔍 Visão Geral")
     col1, col2, col3, col4 = st.columns(4)
     col1.metric("⚡ Consumo Diário", f"{metrics.get('daily_average_kwh', 0):.2f} kWh")
-    col2.metric("💰 Custo Mensal Estimado", f"R$ {metrics.get('estimated_monthly_cost_brl', 0):.2f}")
-    col3.metric("📆 Projeção Mensal", f"{metrics.get('monthly_projection_kwh', 0):.1f} kWh")
+    col2.metric(
+        "💰 Custo Mensal Estimado",
+        f"R$ {metrics.get('estimated_monthly_cost_brl', 0):.2f}",
+    )
+    col3.metric(
+        "📆 Projeção Mensal", f"{metrics.get('monthly_projection_kwh', 0):.1f} kWh"
+    )
     status = metrics.get("status", "normal")
     col4.metric("🚦 Status", "🟢 Normal" if status == "normal" else "⚠️ Atenção")
 
@@ -373,13 +416,15 @@ def render_smartlife_dashboard(smartlife_data: dict):
     st.markdown("### 🕒 Duração do Dispositivo")
     runtime_info = metrics.get("runtime_hours", {})
     if runtime_info:
-        runtime_df = pd.DataFrame([
-            {
-                "Período": period,
-                "Horas": hours,
-            }
-            for period, hours in runtime_info.items()
-        ])
+        runtime_df = pd.DataFrame(
+            [
+                {
+                    "Período": period,
+                    "Horas": hours,
+                }
+                for period, hours in runtime_info.items()
+            ]
+        )
         st.plotly_chart(
             px.bar(runtime_df, x="Período", y="Horas", title="Tempo de Uso (h)"),
             use_container_width=True,
@@ -401,7 +446,9 @@ def render_chat_assistant():
         st.session_state.chat_history = []
 
     provider = st.selectbox("Modelo", ["auto", "openai", "gemini"], index=0)
-    question = st.text_input("Pergunte sobre seu consumo ou custos", "Como foi meu consumo hoje?")
+    question = st.text_input(
+        "Pergunte sobre seu consumo ou custos", "Como foi meu consumo hoje?"
+    )
 
     if st.button("Enviar pergunta", type="primary"):
         if question.strip():
@@ -415,7 +462,10 @@ def render_chat_assistant():
                 if response.status_code == 200:
                     data = response.json()
                     st.session_state.chat_history.append(
-                        {"role": "assistant", "content": data.get("response", "Sem resposta.")}
+                        {
+                            "role": "assistant",
+                            "content": data.get("response", "Sem resposta."),
+                        }
                     )
                 else:
                     st.error("Falha ao consultar o assistente.")
@@ -437,143 +487,146 @@ else:
 
 smartlife_data = load_smartlife_data()
 
-tabs = st.tabs(["TP-Link Tapo", "SmartLife", "Assistente"])
+tab_tapo, tab_smartlife, tab_assistant = st.tabs(
+    ["TP-Link Tapo", "SmartLife", "Assistente"]
+)
 
-with tabs[0]:
+with tab_tapo:
     render_tapo_dashboard(realtime_data)
 
-with tabs[1]:
+    # Seções adicionais somente na aba Tapo
+    st.markdown("---")
+    st.markdown("## 📈 Relatórios e Análises")
+
+    col1, col2 = st.columns(2)
+
+    with col1:
+        st.markdown("### 📋 Relatório Diário")
+        report_date = st.date_input(
+            "Data do Relatório",
+            value=datetime.now().date(),
+            max_value=datetime.now().date(),
+        )
+
+        if st.button("Gerar Relatório"):
+            with st.spinner("Gerando relatório..."):
+                report_data = get_api_data(f"/reports/daily?date={report_date}")
+                if report_data and "error" not in report_data:
+                    st.success("Relatório gerado com sucesso!")
+
+                    st.markdown("#### 📊 Resumo do Dia")
+                    st.write(
+                        f"**Consumo Total:** {format_energy(report_data.get('total_energy_kwh', 0))}"
+                    )
+                    st.write(
+                        f"**Custo Total:** {format_cost(report_data.get('total_cost', 0))}"
+                    )
+                    st.write(f"**Dispositivos:** {len(report_data.get('devices', []))}")
+
+                    if report_data.get("anomalies"):
+                        st.markdown("#### ⚠️ Anomalias Detectadas")
+                        for anomaly in report_data["anomalies"]:
+                            st.warning(anomaly.get("description", "Anomalia detectada"))
+
+                    if st.button("📧 Enviar Relatório por Email/Telegram"):
+                        send_result = requests.post(
+                            f"{API_BASE_URL}/reports/daily/send?date={report_date}"
+                        )
+                        if send_result.status_code == 200:
+                            st.success("Relatório enviado com sucesso!")
+                        else:
+                            st.error("Erro ao enviar relatório")
+
+    with col2:
+        st.markdown("### 🔌 Controle de Dispositivos")
+
+        if realtime_data and "devices" in realtime_data:
+            devices = realtime_data["devices"]
+            device_names = [d["device_name"] for d in devices]
+
+            if device_names:
+                selected_device = st.selectbox(
+                    "Selecione um dispositivo:", device_names
+                )
+
+                if selected_device:
+                    device_info = next(
+                        d for d in devices if d["device_name"] == selected_device
+                    )
+
+                    st.write(f"**IP:** {device_info.get('ip_address', 'N/A')}")
+                    st.write(f"**Local:** {device_info.get('location', 'N/A')}")
+                    st.write(
+                        f"**Status:** {'🟢 Ativo' if device_info.get('is_active') else '🔴 Inativo'}"
+                    )
+
+                    col_on, col_off = st.columns(2)
+
+                    with col_on:
+                        if st.button("🟢 Ligar", key=f"on_{selected_device}"):
+                            device_id = device_info.get("device_id")
+                            result = requests.post(
+                                f"{API_BASE_URL}/devices/{device_id}/control?action=on"
+                            )
+                            if result.status_code == 200:
+                                st.success("Comando de ligar enviado!")
+                                time.sleep(2)
+                                st.rerun()
+                            else:
+                                st.error("Erro ao enviar comando")
+
+                    with col_off:
+                        if st.button("🔴 Desligar", key=f"off_{selected_device}"):
+                            device_id = device_info.get("device_id")
+                            result = requests.post(
+                                f"{API_BASE_URL}/devices/{device_id}/control?action=off"
+                            )
+                            if result.status_code == 200:
+                                st.success("Comando de desligar enviado!")
+                                time.sleep(2)
+                                st.rerun()
+                            else:
+                                st.error("Erro ao enviar comando")
+
+    # Seção de configurações
+    st.markdown("---")
+    st.markdown("## ⚙️ Configurações do Sistema")
+
+    with st.expander("🔧 Configurações da API"):
+        st.code(
+            f"""
+        API Base URL: {API_BASE_URL}
+        Status: {'🟢 Online' if realtime_data else '🔴 Offline'}
+        Auto Refresh: {'Ativado' if auto_refresh else 'Desativado'}
+        """
+        )
+
+    with st.expander("📱 Testar Notificações"):
+        if st.button("🧪 Testar Notificações"):
+            with st.spinner("Testando configurações..."):
+                test_result = get_api_data("/notifications/test")
+                if test_result:
+                    st.json(test_result)
+                else:
+                    st.error("Falha ao testar notificações")
+
+    # Auto refresh apenas na aba principal
+    if auto_refresh:
+        time.sleep(refresh_interval)
+        st.rerun()
+
+    st.markdown("---")
+    st.markdown(
+        """
+        <div style='text-align: center; color: gray;'>
+            🏠 Casa Inteligente Dashboard | Desenvolvido com ❤️ por Patricia Menezes
+        </div>
+        """,
+        unsafe_allow_html=True,
+    )
+
+with tab_smartlife:
     render_smartlife_dashboard(smartlife_data)
 
-with tabs[2]:
+with tab_assistant:
     render_chat_assistant()
-
-# Seção de relatórios
-st.markdown("---")
-st.markdown("## 📈 Relatórios e Análises")
-
-col1, col2 = st.columns(2)
-
-with col1:
-    st.markdown("### 📋 Relatório Diário")
-    report_date = st.date_input(
-        "Data do Relatório",
-        value=datetime.now().date(),
-        max_value=datetime.now().date(),
-    )
-
-    if st.button("Gerar Relatório"):
-        with st.spinner("Gerando relatório..."):
-            report_data = get_api_data(f"/reports/daily?date={report_date}")
-            if report_data and "error" not in report_data:
-                st.success("Relatório gerado com sucesso!")
-
-                st.markdown("#### 📊 Resumo do Dia")
-                st.write(
-                    f"**Consumo Total:** {format_energy(report_data.get('total_energy_kwh', 0))}"
-                )
-                st.write(
-                    f"**Custo Total:** {format_cost(report_data.get('total_cost', 0))}"
-                )
-                st.write(f"**Dispositivos:** {len(report_data.get('devices', []))}")
-
-                if report_data.get("anomalies"):
-                    st.markdown("#### ⚠️ Anomalias Detectadas")
-                    for anomaly in report_data["anomalies"]:
-                        st.warning(anomaly.get("description", "Anomalia detectada"))
-
-                if st.button("📧 Enviar Relatório por Email/Telegram"):
-                    send_result = requests.post(
-                        f"{API_BASE_URL}/reports/daily/send?date={report_date}"
-                    )
-                    if send_result.status_code == 200:
-                        st.success("Relatório enviado com sucesso!")
-                    else:
-                        st.error("Erro ao enviar relatório")
-
-with col2:
-    st.markdown("### 🔌 Controle de Dispositivos")
-
-    if realtime_data and "devices" in realtime_data:
-        devices = realtime_data["devices"]
-        device_names = [d["device_name"] for d in devices]
-
-        if device_names:
-            selected_device = st.selectbox("Selecione um dispositivo:", device_names)
-
-            if selected_device:
-                device_info = next(
-                    d for d in devices if d["device_name"] == selected_device
-                )
-
-                st.write(f"**IP:** {device_info.get('ip_address', 'N/A')}")
-                st.write(f"**Local:** {device_info.get('location', 'N/A')}")
-                st.write(
-                    f"**Status:** {'🟢 Ativo' if device_info.get('is_active') else '🔴 Inativo'}"
-                )
-
-                col_on, col_off = st.columns(2)
-
-                with col_on:
-                    if st.button("🟢 Ligar", key=f"on_{selected_device}"):
-                        device_id = device_info.get("device_id")
-                        result = requests.post(
-                            f"{API_BASE_URL}/devices/{device_id}/control?action=on"
-                        )
-                        if result.status_code == 200:
-                            st.success("Comando de ligar enviado!")
-                            time.sleep(2)
-                            st.rerun()
-                        else:
-                            st.error("Erro ao enviar comando")
-
-                with col_off:
-                    if st.button("🔴 Desligar", key=f"off_{selected_device}"):
-                        device_id = device_info.get("device_id")
-                        result = requests.post(
-                            f"{API_BASE_URL}/devices/{device_id}/control?action=off"
-                        )
-                        if result.status_code == 200:
-                            st.success("Comando de desligar enviado!")
-                            time.sleep(2)
-                            st.rerun()
-                        else:
-                            st.error("Erro ao enviar comando")
-
-# Seção de configurações
-st.markdown("---")
-st.markdown("## ⚙️ Configurações do Sistema")
-
-with st.expander("🔧 Configurações da API"):
-    st.code(
-        f"""
-    API Base URL: {API_BASE_URL}
-    Status: {'🟢 Online' if realtime_data else '🔴 Offline'}
-    Auto Refresh: {'Ativado' if auto_refresh else 'Desativado'}
-    """
-    )
-
-with st.expander("📱 Testar Notificações"):
-    if st.button("🧪 Testar Notificações"):
-        with st.spinner("Testando configurações..."):
-            test_result = get_api_data("/notifications/test")
-            if test_result:
-                st.json(test_result)
-            else:
-                st.error("Falha ao testar notificações")
-
-# Auto refresh
-if auto_refresh:
-    time.sleep(refresh_interval)
-    st.rerun()
-
-# Footer
-st.markdown("---")
-st.markdown(
-    """
-    <div style='text-align: center; color: gray;'>
-        🏠 Casa Inteligente Dashboard | Desenvolvido com ❤️ por Patricia Menezes
-    </div>
-    """,
-    unsafe_allow_html=True,
-)

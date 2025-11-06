@@ -35,8 +35,28 @@ class LLMService:
         if settings.google_ai_api_key:
             try:
                 genai.configure(api_key=settings.google_ai_api_key)
-                self.gemini_client = genai.GenerativeModel("gemini-pro")
-                logger.info("Cliente Google Gemini inicializado")
+                preferred_models = [
+                    "models/gemini-1.5-flash",
+                    "models/gemini-1.5-pro",
+                    "gemini-pro",
+                ]
+                for model_name in preferred_models:
+                    try:
+                        self.gemini_client = genai.GenerativeModel(model_name)
+                        logger.info(
+                            "Cliente Google Gemini inicializado com o modelo %s",
+                            model_name,
+                        )
+                        break
+                    except Exception as model_error:  # tentar próximo modelo
+                        logger.warning(
+                            "Falha ao inicializar modelo Gemini %s: %s",
+                            model_name,
+                            model_error,
+                        )
+                        self.gemini_client = None
+                if not self.gemini_client:
+                    logger.error("Nenhum modelo Gemini pôde ser inicializado")
             except Exception as e:
                 logger.error(f"Erro ao inicializar Google Gemini: {str(e)}")
 
@@ -131,7 +151,7 @@ EXEMPLOS DE PERGUNTAS QUE VOCÊ PODE RESPONDER:
         try:
             context = self.get_system_context()
 
-            response = await self.openai.ChatCompletion.acreate(
+            response = await self.openai_client.ChatCompletion.acreate(
                 model="gpt-3.5-turbo",
                 messages=[
                     {"role": "system", "content": context},
