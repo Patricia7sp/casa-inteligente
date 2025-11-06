@@ -23,13 +23,9 @@ COPY .env.example .env
 # Criar diretório de logs
 RUN mkdir -p logs
 
-# Expor porta (Cloud Run usa variável PORT)
-EXPOSE 8000
-ENV PORT=8000
-
-# Healthcheck
-HEALTHCHECK --interval=30s --timeout=10s --start-period=40s --retries=3 \
-  CMD python -c "import urllib.request; urllib.request.urlopen('http://localhost:8000/health').read()" || exit 1
+# Cloud Run injeta a variável PORT automaticamente
+# Não definir PORT aqui, deixar Cloud Run controlar
 
 # Comando para iniciar a aplicação
-CMD exec uvicorn src.main:app --host 0.0.0.0 --port ${PORT} --timeout-keep-alive 60
+# Cloud Run passa a porta via $PORT
+CMD exec uvicorn src.main:app --host 0.0.0.0 --port ${PORT:-8080} --timeout-keep-alive 60 --log-level info
