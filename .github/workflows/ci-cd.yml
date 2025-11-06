@@ -172,7 +172,8 @@ jobs:
           --set-env-vars TELEGRAM_CHAT_ID=${{ secrets.TELEGRAM_CHAT_ID }} \
           --set-env-vars EMAIL_USERNAME=${{ secrets.EMAIL_USERNAME }} \
           --set-env-vars EMAIL_PASSWORD=${{ secrets.EMAIL_PASSWORD }} \
-          --set-env-vars OPENAI_API_KEY=${{ secrets.OPENAI_API_KEY }}
+          --set-env-vars OPENAI_API_KEY=${{ secrets.OPENAI_API_KEY }} \
+          --set-env-vars GOOGLE_AI_API_KEY=${{ secrets.GOOGLE_AI_API_KEY }}
 
   build_streamlit:
     needs: [security]

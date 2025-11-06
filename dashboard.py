@@ -22,12 +22,70 @@ st.set_page_config(
     initial_sidebar_state="expanded",
 )
 
+# CSS customizado para tema escuro elegante
+st.markdown("""
+<style>
+    .stApp {
+        background: linear-gradient(135deg, #0f0c29 0%, #302b63 50%, #24243e 100%);
+    }
+    .stMetric {
+        background: rgba(255, 255, 255, 0.05);
+        padding: 20px;
+        border-radius: 15px;
+        border: 1px solid rgba(255, 255, 255, 0.1);
+        backdrop-filter: blur(10px);
+    }
+    .stMetric label {
+        color: #a0aec0 !important;
+        font-size: 0.9rem;
+    }
+    .stMetric [data-testid="stMetricValue"] {
+        color: #ffffff !important;
+        font-size: 1.8rem;
+        font-weight: 600;
+    }
+    div[data-testid="stExpander"] {
+        background: rgba(255, 255, 255, 0.05);
+        border-radius: 10px;
+        border: 1px solid rgba(255, 255, 255, 0.1);
+    }
+    .stTabs [data-baseweb="tab-list"] {
+        gap: 8px;
+    }
+    .stTabs [data-baseweb="tab"] {
+        background: rgba(255, 255, 255, 0.05);
+        border-radius: 10px;
+        padding: 10px 20px;
+        color: #a0aec0;
+    }
+    .stTabs [aria-selected="true"] {
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        color: white !important;
+    }
+    h1, h2, h3 {
+        color: #ffffff !important;
+    }
+    .stDataFrame {
+        background: rgba(255, 255, 255, 0.05);
+        border-radius: 10px;
+    }
+</style>
+""", unsafe_allow_html=True)
+
 # Configuração da API
 API_BASE_URL = os.getenv("API_BASE_URL", "http://localhost:8000")
 
 # Título da aplicação
-st.title("🏠 Casa Inteligente Dashboard")
-st.markdown("---")
+st.markdown("""
+<div style='text-align: center; padding: 20px;'>
+    <h1 style='font-size: 3rem; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); 
+               -webkit-background-clip: text; -webkit-text-fill-color: transparent; 
+               font-weight: 800; margin-bottom: 10px;'>
+        🏠 Casa Inteligente
+    </h1>
+    <p style='color: #a0aec0; font-size: 1.1rem;'>Monitoramento Inteligente de Energia</p>
+</div>
+""", unsafe_allow_html=True)
 
 # Sidebar com informações e controles
 st.sidebar.markdown("## 📊 Controles")
@@ -121,7 +179,10 @@ def build_summary_cards_tapo(realtime_data: dict):
 
 def render_tapo_dashboard(realtime_data: dict):
     if not realtime_data or "devices" not in realtime_data:
-        st.info("Sem dados recentes dos dispositivos Tapo.")
+        st.warning("⚠️ Sem dados recentes dos dispositivos Tapo. Verifique a conexão com a API.")
+        with st.expander("🔍 Diagnóstico"):
+            st.code(f"API URL: {API_BASE_URL}/status/realtime")
+            st.info("Certifique-se de que a API está rodando e o banco de dados está acessível.")
         return
 
     devices_df = pd.DataFrame(realtime_data["devices"])
@@ -130,6 +191,64 @@ def render_tapo_dashboard(realtime_data: dict):
         return
 
     build_summary_cards_tapo(realtime_data)
+    
+    # Adicionar gráficos históricos
+    st.markdown("### 📊 Histórico de Consumo")
+    
+    if len(devices_df) > 0:
+        selected_device_id = st.selectbox(
+            "Selecione um dispositivo para ver histórico",
+            options=devices_df["device_id"].tolist(),
+            format_func=lambda x: devices_df[devices_df["device_id"] == x]["device_name"].iloc[0]
+        )
+        
+        col1, col2 = st.columns(2)
+        
+        with col1:
+            weekly_data = get_api_data(f"/devices/{selected_device_id}/weekly?weeks=2")
+            if weekly_data and "data" in weekly_data:
+                df_week = pd.DataFrame(weekly_data["data"])
+                fig_week = px.line(
+                    df_week,
+                    x="date",
+                    y="consumption_kwh",
+                    title="Consumo Semanal (kWh)",
+                    markers=True,
+                    color_discrete_sequence=["#667eea"]
+                )
+                fig_week.update_layout(
+                    plot_bgcolor="rgba(0,0,0,0)",
+                    paper_bgcolor="rgba(0,0,0,0)",
+                    font_color="#ffffff"
+                )
+                st.plotly_chart(fig_week, use_container_width=True)
+        
+        with col2:
+            monthly_data = get_api_data(f"/devices/{selected_device_id}/monthly")
+            if monthly_data:
+                st.metric("💰 Custo Mensal", f"R$ {monthly_data.get('total_cost_brl', 0):.2f}")
+                st.metric("⚡ Consumo Mensal", f"{monthly_data.get('total_energy_kwh', 0):.2f} kWh")
+                st.metric("⏱️ Tempo de Uso", f"{monthly_data.get('runtime_hours', 0):.1f} h")
+    
+    # Ranking de dispositivos
+    st.markdown("### 🏆 Ranking de Consumo (Últimos 30 dias)")
+    ranking_data = get_api_data("/devices/ranking?period_days=30")
+    if ranking_data and "ranking" in ranking_data:
+        df_rank = pd.DataFrame(ranking_data["ranking"])
+        fig_rank = px.bar(
+            df_rank,
+            x="device_name",
+            y="consumption_kwh",
+            color="cost_brl",
+            title="Consumo por Dispositivo",
+            color_continuous_scale="Viridis"
+        )
+        fig_rank.update_layout(
+            plot_bgcolor="rgba(0,0,0,0)",
+            paper_bgcolor="rgba(0,0,0,0)",
+            font_color="#ffffff"
+        )
+        st.plotly_chart(fig_rank, use_container_width=True)
 
     devices_df["Consumo Atual (W)"] = devices_df["current_power_watts"]
     devices_df["Consumo Atual"] = devices_df["Consumo Atual (W)"].apply(format_power)
