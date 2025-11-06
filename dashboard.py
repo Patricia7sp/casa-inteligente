@@ -39,6 +39,7 @@ time_range = st.sidebar.selectbox(
     "Período de Análise", ["Últimas 24h", "Últimos 7 dias", "Últimos 30 dias"], index=0
 )
 
+
 # Funções para obter dados da API
 def get_api_data(endpoint):
     """Obter dados da API"""

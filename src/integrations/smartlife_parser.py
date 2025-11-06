@@ -22,10 +22,10 @@ class SmartLifeReportParser:
     def parse_html_report(self, html_content: str) -> Dict:
         """
         Parsear relatório HTML e extrair dados de consumo
-        
+
         Args:
             html_content: Conteúdo HTML do relatório
-            
+
         Returns:
             Dicionário com dados extraídos
         """
@@ -134,9 +134,11 @@ class SmartLifeReportParser:
                                             "consumption": float(
                                                 match.group(1).replace(",", ".")
                                             ),
-                                            "unit": "kWh"
-                                            if "kWh" in consumption_text
-                                            else "unknown",
+                                            "unit": (
+                                                "kWh"
+                                                if "kWh" in consumption_text
+                                                else "unknown"
+                                            ),
                                         }
                                     )
 

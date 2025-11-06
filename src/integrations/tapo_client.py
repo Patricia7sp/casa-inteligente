@@ -22,11 +22,11 @@ class TapoClient:
     async def add_device(self, ip_address: str, device_name: str) -> bool:
         """
         Adicionar um dispositivo TAPO
-        
+
         Args:
             ip_address: Endereço IP da tomada
             device_name: Nome identificador do dispositivo
-            
+
         Returns:
             bool: True se adicionado com sucesso
         """
@@ -46,10 +46,10 @@ class TapoClient:
     async def get_energy_usage(self, device_name: str) -> Optional[Dict]:
         """
         Obter dados de consumo de energia de um dispositivo
-        
+
         Args:
             device_name: Nome do dispositivo
-            
+
         Returns:
             Dict com dados de consumo ou None se erro
         """
@@ -139,10 +139,10 @@ class TapoClient:
     async def scan_network(self, ip_range: str = "192.168.1") -> List[str]:
         """
         Escanear rede em busca de dispositivos TAPO
-        
+
         Args:
             ip_range: Range de IP para escanear (ex: "192.168.1")
-            
+
         Returns:
             Lista de IPs com dispositivos TAPO encontrados
         """

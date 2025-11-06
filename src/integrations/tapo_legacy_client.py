@@ -34,10 +34,10 @@ class TapoLegacyClient:
     async def test_connection(self, ip_address: str) -> bool:
         """
         Testar conexão básica com dispositivo
-        
+
         Args:
             ip_address: IP da tomada
-            
+
         Returns:
             bool: True se conectar
         """
@@ -60,11 +60,11 @@ class TapoLegacyClient:
     async def add_device(self, ip_address: str, device_name: str) -> bool:
         """
         Adicionar dispositivo TAPO legado
-        
+
         Args:
             ip_address: IP da tomada
             device_name: Nome identificador
-            
+
         Returns:
             bool: True se adicionado com sucesso
         """
@@ -97,10 +97,10 @@ class TapoLegacyClient:
     async def get_energy_usage(self, device_name: str) -> Optional[Dict]:
         """
         Obter dados de consumo (simulado para dispositivos legados)
-        
+
         Args:
             device_name: Nome do dispositivo
-            
+
         Returns:
             Dict: Dados simulados ou None
         """
@@ -136,11 +136,11 @@ class TapoLegacyClient:
     async def control_device(self, device_name: str, action: str) -> bool:
         """
         Controlar dispositivo (simulado)
-        
+
         Args:
             device_name: Nome do dispositivo
             action: "on" ou "off"
-            
+
         Returns:
             bool: True se executado (simulado)
         """
@@ -159,10 +159,10 @@ class TapoLegacyClient:
     async def get_device_info(self, device_name: str) -> Optional[Dict]:
         """
         Obter informações do dispositivo
-        
+
         Args:
             device_name: Nome do dispositivo
-            
+
         Returns:
             Dict: Informações do dispositivo
         """
@@ -185,7 +185,7 @@ class TapoLegacyClient:
     async def list_devices(self) -> List[Dict]:
         """
         Listar todos os dispositivos
-        
+
         Returns:
             List[Dict]: Lista de dispositivos
         """
@@ -210,11 +210,11 @@ class TapoUnifiedClient:
     async def add_device(self, ip_address: str, device_name: str) -> bool:
         """
         Adicionar dispositivo tentando ambos os métodos
-        
+
         Args:
             ip_address: IP da tomada
             device_name: Nome identificador
-            
+
         Returns:
             bool: True se adicionado com sucesso
         """
@@ -263,10 +263,10 @@ class TapoUnifiedClient:
     async def get_energy_usage(self, device_name: str) -> Optional[Dict]:
         """
         Obter dados de energia do dispositivo
-        
+
         Args:
             device_name: Nome do dispositivo
-            
+
         Returns:
             Dict: Dados de energia
         """

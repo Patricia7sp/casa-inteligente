@@ -170,11 +170,11 @@ EXEMPLOS DE PERGUNTAS QUE VOCÊ PODE RESPONDER:
     ) -> Dict[str, Any]:
         """
         Fazer pergunta ao assistente LLM
-        
+
         Args:
             question: Pergunta do usuário
             preferred_provider: "openai", "gemini" ou "auto"
-            
+
         Returns:
             Dict com resposta e metadados
         """
@@ -221,10 +221,10 @@ EXEMPLOS DE PERGUNTAS QUE VOCÊ PODE RESPONDER:
     def get_energy_insights(self, days: int = 7) -> Dict[str, Any]:
         """
         Gerar insights automáticos sobre consumo de energia
-        
+
         Args:
             days: Número de dias para análise
-            
+
         Returns:
             Dict com insights e recomendações
         """

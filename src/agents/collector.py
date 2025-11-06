@@ -46,10 +46,10 @@ class EnergyCollector:
     async def collect_device_data(self, device: Device) -> bool:
         """
         Coletar dados de um dispositivo específico
-        
+
         Args:
             device: Dispositivo para coletar dados
-            
+
         Returns:
             bool: True se coletado com sucesso
         """
@@ -98,7 +98,7 @@ class EnergyCollector:
     async def collect_all_devices(self) -> Dict[str, bool]:
         """
         Coletar dados de todos os dispositivos
-        
+
         Returns:
             Dict com resultados por dispositivo
         """
@@ -157,9 +157,11 @@ class EnergyCollector:
                         "location": device.location,
                         "equipment": device.equipment_connected,
                         "is_online": device_info is not None,
-                        "is_on": device_info.get("device_on", False)
-                        if device_info
-                        else False,
+                        "is_on": (
+                            device_info.get("device_on", False)
+                            if device_info
+                            else False
+                        ),
                     }
                 else:
                     status[device.name] = {

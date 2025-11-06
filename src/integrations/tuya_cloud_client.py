@@ -23,7 +23,7 @@ class TuyaCloudClient:
     def __init__(self, access_id: str, access_key: str, region: str = "us"):
         """
         Inicializar cliente Tuya Cloud
-        
+
         Args:
             access_id: Access ID da Tuya Cloud
             access_key: Access Secret da Tuya Cloud
@@ -51,7 +51,7 @@ class TuyaCloudClient:
     async def _sync_time(self) -> bool:
         """
         Sincronizar tempo com servidor Tuya para evitar erro de timestamp
-        
+
         Returns:
             bool: True se sincronização bem-sucedida
         """
@@ -124,7 +124,7 @@ class TuyaCloudClient:
                     variance = sum((x - median_offset) ** 2 for x in offsets) / len(
                         offsets
                     )
-                    std_dev = variance ** 0.5
+                    std_dev = variance**0.5
                     safety_margin = min(500, std_dev * 2)  # Máximo 500ms de margem
                     self.time_offset += (
                         safety_margin if median_offset > 0 else -safety_margin
@@ -150,7 +150,7 @@ class TuyaCloudClient:
     def _get_timestamp(self) -> str:
         """
         Obter timestamp corrigido para API Tuya
-        
+
         Returns:
             str: Timestamp em milissegundos
         """
@@ -161,13 +161,13 @@ class TuyaCloudClient:
     def _sign_request(self, method: str, path: str, headers: Dict, body: str = ""):
         """
         Gerar assinatura para requisição Tuya
-        
+
         Args:
             method: Método HTTP
             path: Path da API
             headers: Headers da requisição
             body: Body da requisição
-            
+
         Returns:
             Dict: Headers com assinatura
         """
@@ -204,7 +204,7 @@ class TuyaCloudClient:
     async def _get_token(self) -> bool:
         """
         Obter token de acesso da API
-        
+
         Returns:
             bool: True se obtido com sucesso
         """
@@ -248,7 +248,7 @@ class TuyaCloudClient:
     async def get_device_list(self) -> List[Dict]:
         """
         Obter lista de dispositivos
-        
+
         Returns:
             List[Dict]: Lista de dispositivos
         """
@@ -292,10 +292,10 @@ class TuyaCloudClient:
     async def get_device_info(self, device_id: str) -> Optional[Dict]:
         """
         Obter informações detalhadas do dispositivo
-        
+
         Args:
             device_id: ID do dispositivo
-            
+
         Returns:
             Dict: Informações do dispositivo
         """
@@ -337,10 +337,10 @@ class TuyaCloudClient:
     async def get_device_status(self, device_id: str) -> Optional[Dict]:
         """
         Obter status atual do dispositivo
-        
+
         Args:
             device_id: ID do dispositivo
-            
+
         Returns:
             Dict: Status do dispositivo
         """
@@ -382,10 +382,10 @@ class TuyaCloudClient:
     async def get_energy_usage(self, device_id: str) -> Optional[Dict]:
         """
         Obter dados de consumo de energia
-        
+
         Args:
             device_id: ID do dispositivo
-            
+
         Returns:
             Dict: Dados de energia
         """
@@ -437,11 +437,11 @@ class TuyaCloudClient:
     async def control_device(self, device_id: str, commands: List[Dict]) -> bool:
         """
         Controlar dispositivo
-        
+
         Args:
             device_id: ID do dispositivo
             commands: Lista de comandos
-            
+
         Returns:
             bool: True se executado com sucesso
         """
@@ -494,7 +494,7 @@ class TuyaCloudClient:
     async def test_connection(self) -> bool:
         """
         Testar conexão com a API Cloud
-        
+
         Returns:
             bool: True se conexão OK
         """

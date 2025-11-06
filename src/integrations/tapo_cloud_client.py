@@ -72,7 +72,7 @@ class TapoCloudClient:
     async def login(self) -> bool:
         """
         Fazer login na TP-Link Cloud
-        
+
         Returns:
             bool: True se login bem-sucedido
         """
@@ -122,7 +122,7 @@ class TapoCloudClient:
     async def refresh_device_list(self) -> bool:
         """
         Atualizar lista de dispositivos
-        
+
         Returns:
             bool: True se bem-sucedido
         """
@@ -164,7 +164,7 @@ class TapoCloudClient:
     async def get_device_list(self) -> List[Dict]:
         """
         Obter lista de dispositivos
-        
+
         Returns:
             List[Dict]: Lista de dispositivos
         """
@@ -176,10 +176,10 @@ class TapoCloudClient:
     async def get_device_info(self, device_id: str) -> Optional[Dict]:
         """
         Obter informações detalhadas do dispositivo
-        
+
         Args:
             device_id: ID do dispositivo
-            
+
         Returns:
             Dict: Informações do dispositivo
         """
@@ -222,10 +222,10 @@ class TapoCloudClient:
     async def get_energy_usage(self, device_id: str) -> Optional[Dict]:
         """
         Obter dados de consumo de energia
-        
+
         Args:
             device_id: ID do dispositivo
-            
+
         Returns:
             Dict: Dados de energia
         """
@@ -307,11 +307,11 @@ class TapoCloudClient:
     async def control_device(self, device_id: str, action: str) -> bool:
         """
         Controlar dispositivo (ligar/desligar)
-        
+
         Args:
             device_id: ID do dispositivo
             action: "on" ou "off"
-            
+
         Returns:
             bool: True se executado com sucesso
         """
@@ -356,7 +356,7 @@ class TapoCloudClient:
     async def test_connection(self) -> bool:
         """
         Testar conexão com a API Cloud
-        
+
         Returns:
             bool: True se conexão OK
         """
@@ -376,10 +376,10 @@ class TapoCloudClient:
     def find_device_by_name(self, name: str) -> Optional[str]:
         """
         Encontrar device ID pelo nome
-        
+
         Args:
             name: Nome do dispositivo
-            
+
         Returns:
             str: Device ID ou None
         """
@@ -392,10 +392,10 @@ class TapoCloudClient:
     def find_device_by_ip(self, ip: str) -> Optional[str]:
         """
         Encontrar device ID pelo IP (se disponível)
-        
+
         Args:
             ip: IP do dispositivo
-            
+
         Returns:
             str: Device ID ou None
         """

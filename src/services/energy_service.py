@@ -27,11 +27,11 @@ class EnergyAnalysisService:
     ) -> Optional[Dict]:
         """
         Calcular consumo diário de um dispositivo
-        
+
         Args:
             device_id: ID do dispositivo
             date: Data para análise
-            
+
         Returns:
             Dict com estatísticas do consumo diário
         """
@@ -111,11 +111,11 @@ class EnergyAnalysisService:
     ) -> Optional[Dict]:
         """
         Detectar anomalias no consumo de energia
-        
+
         Args:
             device_id: ID do dispositivo
             current_consumption: Consumo atual em watts
-            
+
         Returns:
             Dict com informações da anomalia ou None
         """
@@ -167,10 +167,10 @@ class EnergyAnalysisService:
     def generate_daily_report(self, date: datetime = None) -> Dict:
         """
         Gerar relatório diário completo
-        
+
         Args:
             date: Data do relatório (padrão: hoje)
-            
+
         Returns:
             Dict com relatório completo
         """
@@ -250,11 +250,11 @@ class EnergyAnalysisService:
     def get_consumption_trends(self, device_id: int, days: int = 30) -> Optional[Dict]:
         """
         Obter tendências de consumo de um dispositivo
-        
+
         Args:
             device_id: ID do dispositivo
             days: Número de dias para análise
-            
+
         Returns:
             Dict com tendências de consumo
         """
@@ -314,7 +314,7 @@ class EnergyAnalysisService:
     def get_realtime_status(self) -> Dict:
         """
         Obter status em tempo real de todos os dispositivos
-        
+
         Returns:
             Dict com status atual
         """

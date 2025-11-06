@@ -77,10 +77,10 @@ class GmailSmartLifeClient:
     def search_smartlife_reports(self, days_back: int = 7) -> List[Dict]:
         """
         Buscar relatórios SmartLife dos últimos N dias
-        
+
         Args:
             days_back: Quantos dias para trás buscar (padrão: 7)
-            
+
         Returns:
             Lista de relatórios encontrados
         """

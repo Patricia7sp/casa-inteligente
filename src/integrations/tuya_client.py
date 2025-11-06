@@ -25,7 +25,7 @@ class TuyaClient:
     ):
         """
         Inicializar cliente Tuya
-        
+
         Args:
             device_id: ID do dispositivo Tuya
             local_key: Chave local do dispositivo
@@ -44,7 +44,7 @@ class TuyaClient:
     async def test_connection(self) -> bool:
         """
         Testar conexão com dispositivo Tuya
-        
+
         Returns:
             bool: True se conexão bem-sucedida
         """
@@ -78,7 +78,7 @@ class TuyaClient:
     async def get_device_info(self) -> Optional[Dict]:
         """
         Obter informações do dispositivo
-        
+
         Returns:
             Dict: Informações do dispositivo
         """
@@ -106,7 +106,7 @@ class TuyaClient:
     async def get_energy_usage(self) -> Optional[Dict]:
         """
         Obter dados de consumo de energia (se disponível)
-        
+
         Returns:
             Dict: Dados de energia
         """
@@ -197,10 +197,10 @@ class TuyaClient:
     async def send_command(self, command: Dict) -> Optional[Dict]:
         """
         Enviar comando personalizado para o dispositivo
-        
+
         Args:
             command: Dicionário com comando DPS
-            
+
         Returns:
             Dict: Resposta do dispositivo
         """
@@ -229,10 +229,10 @@ class TuyaClient:
     async def discover_devices(ip_range: str = "192.168.1") -> List[Dict]:
         """
         Descobrir dispositivos Tuya na rede
-        
+
         Args:
             ip_range: Range de IP para escanear
-            
+
         Returns:
             List[Dict]: Lista de dispositivos encontrados
         """

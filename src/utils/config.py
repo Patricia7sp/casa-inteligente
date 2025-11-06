@@ -16,7 +16,9 @@ class Settings(BaseSettings):
     debug: bool = False
 
     # Banco de Dados PostgreSQL
-    database_url: str = "postgresql://postgres:casa_inteligente_2024@localhost:5432/casa_inteligente"
+    database_url: str = (
+        "postgresql://postgres:casa_inteligente_2024@localhost:5432/casa_inteligente"
+    )
     redis_url: str = "redis://localhost:6379"
 
     # APIs de Tomadas
@@ -28,6 +30,8 @@ class Settings(BaseSettings):
     tuya_access_id: str = ""
     tuya_access_key: str = ""
     tuya_region: str = "us"
+    tuya_username: Optional[str] = None
+    tuya_password: Optional[str] = None
 
     # Tuya Local (opcional - para controle local)
     tuya_device_id: str = ""
@@ -44,11 +48,19 @@ class Settings(BaseSettings):
     email_smtp_port: int = 587
     email_username: Optional[str] = None
     email_password: Optional[str] = None
+    email_user: Optional[str] = None
+    email_pass: Optional[str] = None
+    email_from: Optional[str] = None
+    email_to: Optional[str] = None
     email_recipients: List[str] = []
 
     # LLM
     openai_api_key: Optional[str] = None
     google_ai_api_key: Optional[str] = None
+
+    # SmartLife
+    smartlife_username: Optional[str] = None
+    smartlife_password: Optional[str] = None
 
     # Monitoramento
     collection_interval_minutes: int = 15
@@ -61,6 +73,7 @@ class Settings(BaseSettings):
     class Config:
         env_file = ".env"
         case_sensitive = False
+        extra = "ignore"
 
 
 # Instância global de configurações

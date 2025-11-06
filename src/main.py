@@ -417,10 +417,10 @@ async def test_notifications():
 async def ask_ai_assistant(question_data: Dict):
     """
     Fazer pergunta ao assistente inteligente LLM
-    
+
     Args:
         question_data: {"question": "sua pergunta", "provider": "openai|gemini|auto"}
-    
+
     Returns:
         Resposta do assistente com contexto do sistema
     """
@@ -449,10 +449,10 @@ async def ask_ai_assistant(question_data: Dict):
 async def get_energy_insights(days: int = 7):
     """
     Obter insights automáticos sobre consumo de energia
-    
+
     Args:
         days: Número de dias para análise (padrão: 7)
-    
+
     Returns:
         Insights e recomendações automáticas
     """
@@ -480,7 +480,7 @@ async def get_energy_insights(days: int = 7):
 async def get_ai_context():
     """
     Obter contexto atual do sistema para o LLM
-    
+
     Returns:
         Contexto completo do sistema
     """
@@ -497,10 +497,10 @@ async def get_ai_context():
 async def get_personalized_recommendations(device_data: Dict):
     """
     Obter recomendações personalizadas para um dispositivo específico
-    
+
     Args:
         device_data: {"device_id": 1, "days": 30}
-    
+
     Returns:
         Recomendações personalizadas
     """
@@ -571,7 +571,7 @@ Forneça recomendações específicas para otimizar o consumo deste dispositivo.
 async def test_device_connection(connection_data: Dict):
     """
     Testar conexão com dispositivo antes de adicionar
-    
+
     Args:
         connection_data: {
             "type": "TAPO" | "NOVA_DIGITAL",

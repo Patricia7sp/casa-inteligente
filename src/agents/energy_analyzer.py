@@ -31,10 +31,10 @@ class EnergyAnalyzer:
     def analyze_report(self, parsed_data: Dict) -> Dict:
         """
         Analisar relatório completo
-        
+
         Args:
             parsed_data: Dados parseados do relatório
-            
+
         Returns:
             Análise completa com insights
         """
@@ -169,9 +169,9 @@ class EnergyAnalyzer:
                         "date": d["date"],
                         "consumption": consumption,
                         "type": "high",
-                        "severity": "critical"
-                        if consumption > upper_bound * 1.5
-                        else "warning",
+                        "severity": (
+                            "critical" if consumption > upper_bound * 1.5 else "warning"
+                        ),
                         "message": f"Consumo muito alto: {consumption} kWh",
                     }
                 )

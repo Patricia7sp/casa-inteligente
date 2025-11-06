@@ -42,7 +42,7 @@ class TuyaLocalClient:
     async def discover_devices(self) -> List[Dict]:
         """
         Descobrir dispositivos Tuya na rede local
-        
+
         Returns:
             List[Dict]: Lista de dispositivos encontrados
         """
@@ -91,12 +91,12 @@ class TuyaLocalClient:
     async def connect_device(self, device_id: str, ip: str, local_key: str) -> bool:
         """
         Conectar a um dispositivo específico
-        
+
         Args:
             device_id: ID do dispositivo
             ip: Endereço IP do dispositivo
             local_key: Chave local do dispositivo
-            
+
         Returns:
             bool: True se conexão bem-sucedida
         """
@@ -128,10 +128,10 @@ class TuyaLocalClient:
     async def get_device_status(self, device_id: str) -> Optional[Dict]:
         """
         Obter status de um dispositivo
-        
+
         Args:
             device_id: ID do dispositivo
-            
+
         Returns:
             Dict: Status do dispositivo
         """
@@ -152,11 +152,11 @@ class TuyaLocalClient:
     async def control_device(self, device_id: str, command: Dict) -> bool:
         """
         Controlar um dispositivo
-        
+
         Args:
             device_id: ID do dispositivo
             command: Comando de controle
-            
+
         Returns:
             bool: True se comando executado com sucesso
         """
@@ -184,10 +184,10 @@ class TuyaLocalClient:
     async def get_energy_data(self, device_id: str) -> Optional[Dict]:
         """
         Obter dados de energia do dispositivo
-        
+
         Args:
             device_id: ID do dispositivo
-            
+
         Returns:
             Dict: Dados de energia
         """
@@ -220,7 +220,7 @@ class TuyaLocalClient:
     async def test_connection(self) -> bool:
         """
         Testar conexão completa
-        
+
         Returns:
             bool: True se tudo funcionando
         """

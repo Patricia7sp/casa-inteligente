@@ -35,11 +35,11 @@ class NotificationService:
     ) -> bool:
         """
         Enviar mensagem via Telegram
-        
+
         Args:
             message: Mensagem para enviar
             parse_mode: Modo de parse (Markdown, HTML, None)
-            
+
         Returns:
             bool: True se enviado com sucesso
         """
@@ -64,12 +64,12 @@ class NotificationService:
     def send_email(self, subject: str, body: str, is_html: bool = False) -> bool:
         """
         Enviar email
-        
+
         Args:
             subject: Assunto do email
             body: Corpo do email
             is_html: Se o corpo é HTML
-            
+
         Returns:
             bool: True se enviado com sucesso
         """
@@ -115,10 +115,10 @@ class NotificationService:
     async def send_daily_report(self, report_data: Dict) -> bool:
         """
         Enviar relatório diário
-        
+
         Args:
             report_data: Dados do relatório diário
-            
+
         Returns:
             bool: True se enviado com sucesso
         """
@@ -240,10 +240,10 @@ _Casa Inteligente - Seu assistente de energia_"""
     async def send_alert(self, alert_data: Dict) -> bool:
         """
         Enviar alerta de anomalia
-        
+
         Args:
             alert_data: Dados do alerta
-            
+
         Returns:
             bool: True se enviado com sucesso
         """
@@ -287,11 +287,11 @@ _Casa Inteligente - Monitoramento 24/7_"""
     async def send_system_notification(self, message: str, level: str = "INFO") -> bool:
         """
         Enviar notificação do sistema
-        
+
         Args:
             message: Mensagem do sistema
             level: Nível (INFO, WARNING, ERROR)
-            
+
         Returns:
             bool: True se enviado com sucesso
         """
@@ -315,7 +315,7 @@ _Casa Inteligente - Sistema de Monitoramento_"""
     def test_notifications(self) -> Dict[str, bool]:
         """
         Testar configurações de notificação
-        
+
         Returns:
             Dict com resultados dos testes
         """

@@ -39,7 +39,7 @@ class NovaDigitalClient:
     async def authenticate(self) -> bool:
         """
         Autenticar com a API Nova Digital
-        
+
         Returns:
             bool: True se autenticado com sucesso
         """
@@ -70,7 +70,7 @@ class NovaDigitalClient:
     async def get_devices(self) -> List[Dict]:
         """
         Obter lista de dispositivos cadastrados
-        
+
         Returns:
             List[Dict]: Lista de dispositivos
         """
@@ -91,11 +91,11 @@ class NovaDigitalClient:
     async def add_device(self, device_id: str, device_name: str) -> bool:
         """
         Adicionar um dispositivo Nova Digital
-        
+
         Args:
             device_id: ID do dispositivo na Nova Digital
             device_name: Nome identificador local
-            
+
         Returns:
             bool: True se adicionado com sucesso
         """
@@ -130,10 +130,10 @@ class NovaDigitalClient:
     async def get_energy_usage(self, device_name: str) -> Optional[Dict]:
         """
         Obter dados de consumo de energia de um dispositivo
-        
+
         Args:
             device_name: Nome do dispositivo
-            
+
         Returns:
             Dict: Dados de consumo ou None se erro
         """
@@ -177,12 +177,12 @@ class NovaDigitalClient:
     ) -> List[Dict]:
         """
         Obter dados históricos de consumo
-        
+
         Args:
             device_name: Nome do dispositivo
             start_date: Data inicial
             end_date: Data final
-            
+
         Returns:
             List[Dict]: Lista de dados históricos
         """
@@ -232,11 +232,11 @@ class NovaDigitalClient:
     async def control_device(self, device_name: str, action: str) -> bool:
         """
         Controlar dispositivo (ligar/desligar)
-        
+
         Args:
             device_name: Nome do dispositivo
             action: "on" ou "off"
-            
+
         Returns:
             bool: True se executado com sucesso
         """
@@ -268,7 +268,7 @@ class NovaDigitalClient:
     async def test_connection(self) -> bool:
         """
         Testar conexão com a API Nova Digital
-        
+
         Returns:
             bool: True se conexão OK
         """
@@ -294,11 +294,11 @@ class DeviceClientFactory:
     def create_client(device_type: str, **kwargs):
         """
         Criar cliente baseado no tipo de dispositivo
-        
+
         Args:
             device_type: "TAPO" ou "NOVA_DIGITAL"
             **kwargs: Parâmetros específicos do cliente
-            
+
         Returns:
             Instância do cliente correspondente
         """
