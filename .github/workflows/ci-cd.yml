@@ -115,10 +115,14 @@ jobs:
       run: gcloud auth configure-docker us-central1-docker.pkg.dev
 
     - name: Build Docker image
-      run: docker build -t $REGISTRY/$PROJECT_ID/$REPOSITORY/$SERVICE_NAME:$GITHUB_SHA .
+      run: |
+        docker build -t $REGISTRY/$PROJECT_ID/$REPOSITORY/$SERVICE_NAME:$GITHUB_SHA \
+                     -t $REGISTRY/$PROJECT_ID/$REPOSITORY/$SERVICE_NAME:latest .
 
     - name: Push Docker image
-      run: docker push $REGISTRY/$PROJECT_ID/$REPOSITORY/$SERVICE_NAME:$GITHUB_SHA
+      run: |
+        docker push $REGISTRY/$PROJECT_ID/$REPOSITORY/$SERVICE_NAME:$GITHUB_SHA
+        docker push $REGISTRY/$PROJECT_ID/$REPOSITORY/$SERVICE_NAME:latest
 
   deploy:
     needs: build
@@ -161,9 +165,27 @@ jobs:
           --set-env-vars EMAIL_PASSWORD=${{ secrets.EMAIL_PASSWORD }} \
           --set-env-vars OPENAI_API_KEY=${{ secrets.OPENAI_API_KEY }}
 
+    - name: Create GitHub Release
+      if: success()
+      uses: actions/create-release@v1
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      with:
+        tag_name: v${{ github.run_number }}
+        release_name: Release v${{ github.run_number }}
+        body: |
+          🚀 **Deploy Automático para Produção**
+          
+          **Commit:** ${{ github.sha }}
+          **Imagem:** ${{ env.REGISTRY }}/${{ env.PROJECT_ID }}/${{ env.REPOSITORY }}/${{ env.SERVICE_NAME }}:${{ github.sha }}
+          
+          **Mudanças:** ${{ github.event.head_commit.message }}
+        draft: false
+        prerelease: false
+
     - name: Notify deployment
       if: always()
       run: |
         curl -X POST "https://api.telegram.org/bot${{ secrets.TELEGRAM_BOT_TOKEN }}/sendMessage" \
           -d "chat_id=${{ secrets.TELEGRAM_CHAT_ID }}" \
-          -d "text=🚀 Deploy Casa Inteligente: ${{ job.status }} - Commit: ${{ github.sha }}"
+          -d "text=🚀 Deploy Casa Inteligente v${{ github.run_number }}: ${{ job.status }} - Commit: ${{ github.sha }}"

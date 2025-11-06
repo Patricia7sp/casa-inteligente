@@ -23,8 +23,9 @@ COPY .env.example .env
 # Criar diretório de logs
 RUN mkdir -p logs
 
-# Expor porta
+# Expor porta (Cloud Run usa variável PORT)
 EXPOSE 8000
+ENV PORT=8000
 
 # Comando para iniciar a aplicação
-CMD ["uvicorn", "src.main:app", "--host", "0.0.0.0", "--port", "8000"]
+CMD exec uvicorn src.main:app --host 0.0.0.0 --port ${PORT}
