@@ -27,7 +27,7 @@ from src.services.energy_service import (
     energy_service,
     get_device_weekly_consumption,
     get_device_monthly_stats,
-    get_devices_ranking
+    get_devices_ranking,
 )
 from src.services.notification_service import notification_service
 from src.services.llm_service import llm_service
@@ -579,8 +579,7 @@ async def get_device_weekly(device_id: int, weeks: int = 1):
         data = get_device_weekly_consumption(device_id, weeks)
         if not data:
             raise HTTPException(
-                status_code=404,
-                detail="Nenhum dado encontrado para este dispositivo"
+                status_code=404, detail="Nenhum dado encontrado para este dispositivo"
             )
         return {"device_id": device_id, "weeks": weeks, "data": data}
     except HTTPException:
@@ -597,15 +596,16 @@ async def get_device_monthly(device_id: int):
         data = get_device_monthly_stats(device_id)
         if not data:
             raise HTTPException(
-                status_code=404,
-                detail="Nenhum dado encontrado para este dispositivo"
+                status_code=404, detail="Nenhum dado encontrado para este dispositivo"
             )
         return data
     except HTTPException:
         raise
     except Exception as e:
         logger.error(f"Erro ao obter estatísticas mensais: {e}")
-        raise HTTPException(status_code=500, detail="Erro ao obter estatísticas mensais")
+        raise HTTPException(
+            status_code=500, detail="Erro ao obter estatísticas mensais"
+        )
 
 
 @app.get("/devices/ranking")
@@ -615,8 +615,7 @@ async def get_ranking(period_days: int = 30):
         data = get_devices_ranking(period_days)
         if not data:
             raise HTTPException(
-                status_code=404,
-                detail="Nenhum dado disponível para ranking"
+                status_code=404, detail="Nenhum dado disponível para ranking"
             )
         return {"period_days": period_days, "ranking": data}
     except HTTPException:

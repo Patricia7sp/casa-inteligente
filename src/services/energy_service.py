@@ -22,33 +22,35 @@ def get_device_weekly_consumption(device_id: int, weeks: int = 1) -> List[Dict]:
         db = next(get_db())
         end_date = datetime.now()
         start_date = end_date - timedelta(weeks=weeks)
-        
+
         readings = (
             db.query(
                 func.date(EnergyReading.timestamp).label("date"),
-                func.sum(EnergyReading.power_watts).label("total_power")
+                func.sum(EnergyReading.power_watts).label("total_power"),
             )
             .filter(
                 and_(
                     EnergyReading.device_id == device_id,
                     EnergyReading.timestamp >= start_date,
-                    EnergyReading.timestamp <= end_date
+                    EnergyReading.timestamp <= end_date,
                 )
             )
             .group_by(func.date(EnergyReading.timestamp))
             .order_by(func.date(EnergyReading.timestamp))
             .all()
         )
-        
+
         result = []
         for date, total_power in readings:
             energy_kwh = (total_power / 1000) / 60  # Converter para kWh
-            result.append({
-                "date": str(date),
-                "consumption_kwh": round(energy_kwh, 3),
-                "cost_brl": round(energy_kwh * settings.energy_cost_per_kwh, 2)
-            })
-        
+            result.append(
+                {
+                    "date": str(date),
+                    "consumption_kwh": round(energy_kwh, 3),
+                    "cost_brl": round(energy_kwh * settings.energy_cost_per_kwh, 2),
+                }
+            )
+
         db.close()
         return result
     except Exception as e:
@@ -62,31 +64,30 @@ def get_device_monthly_stats(device_id: int) -> Dict:
         db = next(get_db())
         end_date = datetime.now()
         start_date = end_date.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
-        
+
         readings = (
             db.query(EnergyReading)
             .filter(
                 and_(
                     EnergyReading.device_id == device_id,
                     EnergyReading.timestamp >= start_date,
-                    EnergyReading.timestamp <= end_date
+                    EnergyReading.timestamp <= end_date,
                 )
             )
             .all()
         )
-        
+
         if not readings:
             db.close()
             return {}
-        
-        df = pd.DataFrame([{
-            "timestamp": r.timestamp,
-            "power_watts": r.power_watts
-        } for r in readings])
-        
+
+        df = pd.DataFrame(
+            [{"timestamp": r.timestamp, "power_watts": r.power_watts} for r in readings]
+        )
+
         total_energy_kwh = (df["power_watts"].sum() / 1000) / 60
         runtime_hours = len(df[df["power_watts"] > 0]) / 60
-        
+
         db.close()
         return {
             "device_id": device_id,
@@ -94,7 +95,7 @@ def get_device_monthly_stats(device_id: int) -> Dict:
             "total_energy_kwh": round(total_energy_kwh, 3),
             "total_cost_brl": round(total_energy_kwh * settings.energy_cost_per_kwh, 2),
             "runtime_hours": round(runtime_hours, 1),
-            "avg_daily_kwh": round(total_energy_kwh / end_date.day, 3)
+            "avg_daily_kwh": round(total_energy_kwh / end_date.day, 3),
         }
     except Exception as e:
         logger.error(f"Erro ao obter estatísticas mensais: {e}")
@@ -107,38 +108,40 @@ def get_devices_ranking(period_days: int = 30) -> List[Dict]:
         db = next(get_db())
         end_date = datetime.now()
         start_date = end_date - timedelta(days=period_days)
-        
+
         rankings = (
             db.query(
                 Device.id,
                 Device.name,
                 Device.location,
-                func.sum(EnergyReading.power_watts).label("total_power")
+                func.sum(EnergyReading.power_watts).label("total_power"),
             )
             .join(EnergyReading, Device.id == EnergyReading.device_id)
             .filter(
                 and_(
                     EnergyReading.timestamp >= start_date,
-                    EnergyReading.timestamp <= end_date
+                    EnergyReading.timestamp <= end_date,
                 )
             )
             .group_by(Device.id, Device.name, Device.location)
             .order_by(func.sum(EnergyReading.power_watts).desc())
             .all()
         )
-        
+
         result = []
         for rank, (device_id, name, location, total_power) in enumerate(rankings, 1):
             energy_kwh = (total_power / 1000) / 60
-            result.append({
-                "rank": rank,
-                "device_id": device_id,
-                "device_name": name,
-                "location": location,
-                "consumption_kwh": round(energy_kwh, 3),
-                "cost_brl": round(energy_kwh * settings.energy_cost_per_kwh, 2)
-            })
-        
+            result.append(
+                {
+                    "rank": rank,
+                    "device_id": device_id,
+                    "device_name": name,
+                    "location": location,
+                    "consumption_kwh": round(energy_kwh, 3),
+                    "cost_brl": round(energy_kwh * settings.energy_cost_per_kwh, 2),
+                }
+            )
+
         db.close()
         return result
     except Exception as e:
