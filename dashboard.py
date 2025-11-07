@@ -117,7 +117,15 @@ time_range_options = {
 time_range_label = st.sidebar.selectbox(
     "Período de Análise", list(time_range_options.keys()), index=2
 )
-time_range_days = time_range_options[time_range_label]
+
+if st.sidebar.button("🔄 Aplicar Filtro", type="primary"):
+    st.session_state.time_range_days = time_range_options[time_range_label]
+    st.rerun()
+
+if "time_range_days" not in st.session_state:
+    st.session_state.time_range_days = time_range_options[time_range_label]
+
+time_range_days = st.session_state.time_range_days
 
 
 # Funções utilitárias
@@ -629,4 +637,10 @@ with tab_smartlife:
     render_smartlife_dashboard(smartlife_data)
 
 with tab_assistant:
-    render_chat_assistant()
+    try:
+        render_chat_assistant()
+    except Exception as e:
+        st.error(f"Erro ao carregar o assistente: {str(e)}")
+        st.info(
+            "Por favor, verifique se a API está online e as chaves LLM estão configuradas."
+        )
