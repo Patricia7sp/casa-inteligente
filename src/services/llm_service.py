@@ -38,6 +38,7 @@ class LLMService:
             try:
                 genai.configure(api_key=settings.google_ai_api_key)
                 preferred_models = [
+                    "models/gemini-2.5-pro",
                     "models/gemini-1.5-flash",
                     "models/gemini-1.5-pro",
                     "gemini-pro",
@@ -157,7 +158,7 @@ EXEMPLOS DE PERGUNTAS QUE VOCÊ PODE RESPONDER:
             context = self.get_system_context()
 
             response = await self.openai_client.ChatCompletion.acreate(
-                model="gpt-3.5-turbo",
+                model="gpt-5-nano",
                 messages=[
                     {"role": "system", "content": context},
                     {"role": "user", "content": question},
