@@ -734,6 +734,74 @@ async def get_supported_device_types():
     }
 
 
+@app.post("/devices/discover-cloud")
+async def discover_cloud_devices():
+    """
+    Descobrir dispositivos TAPO via TP-Link Cloud
+    """
+    try:
+        from src.integrations.tapo_cloud_client import TapoCloudClient
+
+        discovered_devices = []
+
+        async with TapoCloudClient(
+            settings.tapo_username, settings.tapo_password
+        ) as cloud_client:
+            # Login na cloud
+            if await cloud_client.login():
+                logger.info("Login TP-Link Cloud bem-sucedido")
+
+                # Obter lista de dispositivos
+                devices = await cloud_client.get_device_list()
+
+                for device in devices:
+                    device_id = device.get("deviceId")
+                    device_name = device.get("alias", f"TAPO_{device_id[:8]}")
+                    device_model = device.get("deviceModel", "Unknown")
+                    device_mac = device.get("deviceMac", "")
+
+                    # Tentar obter IP do dispositivo
+                    device_info = await cloud_client.get_device_info(device_id)
+                    ip_address = None
+                    if device_info:
+                        ip_address = device_info.get("ip", device_info.get("ipAddress"))
+
+                    discovered_devices.append(
+                        {
+                            "device_id": device_id,
+                            "name": device_name,
+                            "type": "TAPO",
+                            "model": device_model,
+                            "mac_address": device_mac,
+                            "ip_address": ip_address,
+                            "status": device.get("status", "unknown"),
+                            "data_source": "tapo_cloud",
+                        }
+                    )
+
+                logger.info(
+                    f"Descobertos {len(discovered_devices)} dispositivos via Cloud"
+                )
+                return {
+                    "discovered_devices": discovered_devices,
+                    "total_found": len(discovered_devices),
+                    "scan_type": "tapo_cloud",
+                }
+            else:
+                raise HTTPException(
+                    status_code=401,
+                    detail="Falha ao fazer login na TP-Link Cloud. Verifique credenciais.",
+                )
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Erro ao descobrir dispositivos via Cloud: {str(e)}")
+        raise HTTPException(
+            status_code=500, detail=f"Erro ao descobrir dispositivos: {str(e)}"
+        )
+
+
 @app.post("/devices/discover-local")
 async def discover_local_devices():
     """
@@ -748,6 +816,8 @@ async def discover_local_devices():
             "192.168.0.100",
             "192.168.0.101",
             "192.168.0.102",
+            "192.168.68.100",
+            "192.168.68.101",
         ]
 
         discovered_devices = []
