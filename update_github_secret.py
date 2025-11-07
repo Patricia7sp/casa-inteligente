@@ -11,7 +11,7 @@ GITHUB_TOKEN = os.getenv("GITHUB_TOKEN")  # Forneça via variável de ambiente
 REPO_OWNER = "Patricia7sp"
 REPO_NAME = "casa-inteligente"
 SECRET_NAME = "DATABASE_URL"
-SECRET_VALUE = "postgresql://postgres:hafbuf-6vomdo-bucsUq@db.pqqrodiuuhckvdqawgeg.supabase.co:5432/postgres"
+SECRET_VALUE = "postgresql://postgres:hafbuf-6vomdo-bucsUq@db.pqqrodiuuhckvdqawgeg.supabase.co:5432/postgres?sslmode=require"
 
 def encrypt_secret(public_key: str, secret_value: str) -> str:
     """Encrypt a Unicode string using the public key."""
