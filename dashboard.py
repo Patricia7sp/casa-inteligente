@@ -637,10 +637,4 @@ with tab_smartlife:
     render_smartlife_dashboard(smartlife_data)
 
 with tab_assistant:
-    try:
-        render_chat_assistant()
-    except Exception as e:
-        st.error(f"Erro ao carregar o assistente: {str(e)}")
-        st.info(
-            "Por favor, verifique se a API está online e as chaves LLM estão configuradas."
-        )
+    render_chat_assistant()
