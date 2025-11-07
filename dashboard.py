@@ -392,10 +392,10 @@ def render_tapo_dashboard():
 
     # Converter para DataFrame
     devices_df = pd.DataFrame(active_devices)
-    
+
     # Adicionar coluna device_name se não existir (compatibilidade)
-    if 'name' in devices_df.columns and 'device_name' not in devices_df.columns:
-        devices_df['device_name'] = devices_df['name']
+    if "name" in devices_df.columns and "device_name" not in devices_df.columns:
+        devices_df["device_name"] = devices_df["name"]
 
     # Cards de resumo
     build_summary_cards(active_devices, readings_data or [])
