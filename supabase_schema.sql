@@ -51,6 +51,19 @@ CREATE TABLE IF NOT EXISTS reports (
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
+-- Tabela de relatórios diários
+CREATE TABLE IF NOT EXISTS daily_reports (
+    id SERIAL PRIMARY KEY,
+    report_date DATE NOT NULL UNIQUE,
+    total_consumption_kwh FLOAT,
+    total_cost FLOAT,
+    peak_power_watts FLOAT,
+    peak_time TIMESTAMP,
+    devices_active INTEGER,
+    data JSONB,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
 -- Tabela de usuários
 CREATE TABLE IF NOT EXISTS users (
     id SERIAL PRIMARY KEY,
@@ -67,13 +80,15 @@ CREATE INDEX IF NOT EXISTS idx_energy_readings_device_id ON energy_readings(devi
 CREATE INDEX IF NOT EXISTS idx_energy_readings_timestamp ON energy_readings(timestamp);
 CREATE INDEX IF NOT EXISTS idx_alerts_device_id ON alerts(device_id);
 CREATE INDEX IF NOT EXISTS idx_devices_ip_address ON devices(ip_address);
+CREATE INDEX IF NOT EXISTS idx_daily_reports_date ON daily_reports(report_date);
 
--- Inserir dispositivos iniciais
+-- Inserir dispositivos iniciais (incluindo os 2 dispositivos TAPO reais)
 INSERT INTO devices (name, type, ip_address, location, equipment_connected, is_active)
 VALUES 
     ('Tomada NovaDigital', 'TUYA_CLOUD', '192.168.68.100', 'Casa', 'NovaDigital', TRUE),
     ('Dispositivo Teste', 'TAPO', '192.168.68.101', 'Teste', 'Teste', TRUE),
-    ('Tomada TAPO Real', 'TAPO', '192.168.68.108', 'Casa', 'Dispositivo Real', TRUE)
+    ('Tomada TAPO Real', 'TAPO', '192.168.68.108', 'Notebook', 'Dispositivo Real', TRUE),
+    ('Tomada TAPO Real', 'TAPO', '192.168.68.110', 'Purificador', 'Dispositivo Real', TRUE)
 ON CONFLICT DO NOTHING;
 
 -- Habilitar Row Level Security (RLS) - Opcional, mas recomendado
@@ -81,6 +96,7 @@ ALTER TABLE devices ENABLE ROW LEVEL SECURITY;
 ALTER TABLE energy_readings ENABLE ROW LEVEL SECURITY;
 ALTER TABLE alerts ENABLE ROW LEVEL SECURITY;
 ALTER TABLE reports ENABLE ROW LEVEL SECURITY;
+ALTER TABLE daily_reports ENABLE ROW LEVEL SECURITY;
 ALTER TABLE users ENABLE ROW LEVEL SECURITY;
 
 -- Criar políticas para permitir acesso via service role
@@ -88,4 +104,5 @@ CREATE POLICY "Enable all access for service role" ON devices FOR ALL USING (tru
 CREATE POLICY "Enable all access for service role" ON energy_readings FOR ALL USING (true);
 CREATE POLICY "Enable all access for service role" ON alerts FOR ALL USING (true);
 CREATE POLICY "Enable all access for service role" ON reports FOR ALL USING (true);
+CREATE POLICY "Enable all access for service role" ON daily_reports FOR ALL USING (true);
 CREATE POLICY "Enable all access for service role" ON users FOR ALL USING (true);
