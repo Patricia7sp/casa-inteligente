@@ -27,6 +27,8 @@ class LLMService:
             try:
                 openai.api_key = settings.openai_api_key
                 self.openai_client = openai
+                # Compatibilidade com códigos antigos que referenciam self.openai
+                self.openai = self.openai_client
                 logger.info("Cliente OpenAI inicializado")
             except Exception as e:
                 logger.error(f"Erro ao inicializar OpenAI: {str(e)}")
@@ -43,6 +45,7 @@ class LLMService:
                 for model_name in preferred_models:
                     try:
                         self.gemini_client = genai.GenerativeModel(model_name)
+                        self.gemini_model_name = model_name
                         logger.info(
                             "Cliente Google Gemini inicializado com o modelo %s",
                             model_name,
@@ -59,6 +62,8 @@ class LLMService:
                     logger.error("Nenhum modelo Gemini pôde ser inicializado")
             except Exception as e:
                 logger.error(f"Erro ao inicializar Google Gemini: {str(e)}")
+        else:
+            self.gemini_model_name = None
 
     def get_system_context(self) -> str:
         """Obter contexto do sistema para o LLM"""
@@ -178,12 +183,17 @@ EXEMPLOS DE PERGUNTAS QUE VOCÊ PODE RESPONDER:
             prompt = f"{context}\n\nPERGUNTA DO USUÁRIO: {question}"
 
             response = self.gemini_client.generate_content(prompt)
+            if hasattr(response, "text") and response.text:
+                return response.text
 
-            return response.text
+            return "Nenhuma resposta retornada pelo modelo Gemini."
 
         except Exception as e:
             logger.error(f"Erro ao consultar Gemini: {str(e)}")
-            return f"Erro ao processar pergunta: {str(e)}"
+            model_hint = (
+                f" (modelo: {getattr(self, 'gemini_model_name', 'desconhecido')})"
+            )
+            return f"Erro ao processar pergunta: {str(e)}{model_hint}"
 
     async def ask_question(
         self, question: str, preferred_provider: str = "openai"
