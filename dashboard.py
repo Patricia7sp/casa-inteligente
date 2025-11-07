@@ -99,6 +99,25 @@ SUPABASE_KEY = os.getenv(
     "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InBxcXJvZGl1dWhja3ZkcWF3Z2VnIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjI0OTI0MTIsImV4cCI6MjA3ODA2ODQxMn0.ve7NIbFcZdTGa16O3Pttmpx2mxWgklvbPwwTSCHuDFs",
 )
 
+TAPO_DEVICE_PROFILES = {
+    "purificador": {
+        "label": "Purificador",
+        "aliases": ["tomada inteligente - purificador"],
+        "keywords": ["purificador"],
+        "icon": "🌬️",
+        "color": "#667eea",
+    },
+    "notebook": {
+        "label": "Notebook",
+        "aliases": ["tomada inteligente - notebook"],
+        "keywords": ["notebook"],
+        "icon": "💻",
+        "color": "#764ba2",
+    },
+}
+
+TAPO_COLOR_FALLBACK = "#f093fb"
+
 # Título da aplicação
 st.markdown(
     """
@@ -201,6 +220,95 @@ def format_cost(value):
     return f"R$ {value:.2f}"
 
 
+def classify_tapo_device(device: dict) -> str | None:
+    """Classificar dispositivo TAPO com base em nome/equipamento."""
+
+    name = (device.get("name") or "").lower()
+    equipment = (device.get("equipment_connected") or "").lower()
+
+    for profile_key, profile in TAPO_DEVICE_PROFILES.items():
+        # Verificar aliases exatos
+        if any(alias in name for alias in profile.get("aliases", [])):
+            return profile_key
+
+        # Verificar palavras-chave em nome ou equipamento
+        if any(keyword in name for keyword in profile.get("keywords", [])):
+            return profile_key
+        if any(keyword in equipment for keyword in profile.get("keywords", [])):
+            return profile_key
+
+    return None
+
+
+def get_profile_color(profile_key: str) -> str:
+    """Obter cor padrão para o perfil TAPO informado."""
+
+    return TAPO_DEVICE_PROFILES.get(profile_key, {}).get("color", TAPO_COLOR_FALLBACK)
+
+
+def get_profile_label(profile_key: str, default: str) -> str:
+    """Obter rótulo amigável para o perfil TAPO."""
+
+    return TAPO_DEVICE_PROFILES.get(profile_key, {}).get("label", default)
+
+
+def get_profile_icon(profile_key: str) -> str:
+    """Obter ícone representativo do perfil TAPO."""
+
+    return TAPO_DEVICE_PROFILES.get(profile_key, {}).get("icon", "🔌")
+
+
+def build_color_map(devices: list[dict]) -> dict[str, str]:
+    """Construir mapa nome -> cor para gráficos."""
+
+    color_map: dict[str, str] = {}
+    for device in devices:
+        name = (
+            device.get("device_name")
+            or device.get("display_name")
+            or device.get("name")
+        )
+        profile_key = device.get("profile_key")
+        if not name:
+            continue
+        color_map[name] = get_profile_color(profile_key)
+    return color_map
+
+
+def create_single_device_line(
+    df: pd.DataFrame,
+    y_col: str,
+    title: str,
+    color: str,
+    yaxis_title: str,
+) -> go.Figure:
+    """Criar gráfico de linha para um único dispositivo."""
+
+    if df.empty:
+        return go.Figure()
+
+    fig = px.line(
+        df,
+        x="timestamp",
+        y=y_col,
+        title=title,
+        markers=True,
+        color_discrete_sequence=[color],
+    )
+
+    fig.update_layout(
+        height=320,
+        plot_bgcolor="rgba(0,0,0,0)",
+        paper_bgcolor="rgba(0,0,0,0)",
+        font_color="#ffffff",
+        yaxis_title=yaxis_title,
+    )
+
+    fig.update_traces(line=dict(width=3))
+
+    return fig
+
+
 def build_summary_cards(devices_data, readings_data):
     """Construir cards de resumo"""
     col1, col2, col3, col4 = st.columns(4)
@@ -281,17 +389,34 @@ def create_power_gauge(value, title, max_value=100):
     return fig
 
 
-def create_consumption_chart(df, title):
+def create_consumption_chart(
+    df,
+    title,
+    color_field="device_name",
+    color_map=None,
+):
     """Criar gráfico de consumo"""
-    fig = px.line(
-        df,
-        x="timestamp",
-        y="power_watts",
-        color="device_name",
-        title=title,
-        markers=True,
-        color_discrete_sequence=["#667eea", "#764ba2", "#f093fb", "#f5576c"],
-    )
+
+    if color_field:
+        fig = px.line(
+            df,
+            x="timestamp",
+            y="power_watts",
+            color=color_field,
+            title=title,
+            markers=True,
+            color_discrete_map=color_map or {},
+            color_discrete_sequence=["#667eea", "#764ba2", "#f093fb", "#f5576c"],
+        )
+    else:
+        fig = px.line(
+            df,
+            x="timestamp",
+            y="power_watts",
+            title=title,
+            markers=True,
+            color_discrete_sequence=["#667eea"],
+        )
 
     fig.update_layout(
         height=400,
@@ -307,14 +432,19 @@ def create_consumption_chart(df, title):
     return fig
 
 
-def create_device_comparison_chart(devices_df):
+def create_device_comparison_chart(
+    devices_df,
+    label_field="device_name",
+    color_map=None,
+):
     """Criar gráfico de comparação entre dispositivos"""
     fig = px.bar(
         devices_df,
-        x="device_name",
+        x=label_field,
         y="current_power_watts",
-        color="device_name",
+        color=label_field,
         title="Consumo Atual por Dispositivo",
+        color_discrete_map=color_map or {},
         color_discrete_sequence=["#667eea", "#764ba2", "#f093fb", "#f5576c"],
     )
 
@@ -335,13 +465,18 @@ def create_device_comparison_chart(devices_df):
     return fig
 
 
-def create_energy_pie_chart(devices_df):
+def create_energy_pie_chart(
+    devices_df,
+    label_field="device_name",
+    color_map=None,
+):
     """Criar gráfico de pizza de distribuição de energia"""
     fig = px.pie(
         devices_df,
         values="current_power_watts",
-        names="device_name",
+        names=label_field,
         title="Distribuição de Consumo",
+        color_discrete_map=color_map or {},
         color_discrete_sequence=["#667eea", "#764ba2", "#f093fb", "#f5576c"],
     )
 
@@ -384,15 +519,31 @@ def render_tapo_dashboard():
             st.error("❌ Falha em todas as fontes de dados")
             return
 
-    # Filtrar apenas dispositivos ativos
-    active_devices = [d for d in devices_data if d.get("is_active")]
+    # Filtrar apenas dispositivos TAPO relevantes
+    tapo_devices = []
+    for device in devices_data:
+        if not device.get("is_active"):
+            continue
 
-    if not active_devices:
-        st.warning("⚠️ Nenhum dispositivo TAPO ativo encontrado")
+        profile_key = classify_tapo_device(device)
+        if profile_key:
+            device = device.copy()
+            profile_label = get_profile_label(
+                profile_key, device.get("name", "Dispositivo TAPO")
+            )
+            icon = get_profile_icon(profile_key)
+
+            device["profile_key"] = profile_key
+            device["profile_label"] = profile_label
+            device["display_name"] = f"{icon} {profile_label}"
+            tapo_devices.append(device)
+
+    if not tapo_devices:
+        st.warning("⚠️ Nenhum dispositivo TAPO relevante encontrado")
         return
 
     # Converter para DataFrame
-    devices_df = pd.DataFrame(active_devices)
+    devices_df = pd.DataFrame(tapo_devices)
 
     if devices_df.empty:
         st.warning("⚠️ Não há dados dos dispositivos para exibir.")
@@ -451,55 +602,80 @@ def render_tapo_dashboard():
     ).fillna(0.0)
 
     # Cards de resumo
-    build_summary_cards(active_devices, readings_data or [])
+    build_summary_cards(tapo_devices, readings_data or [])
 
     st.markdown("---")
+
+    # Preparar rótulos e cores harmonizados
+    if "display_name" not in devices_df.columns:
+        devices_df["display_name"] = devices_df["device_name"]
+    devices_df["display_label"] = devices_df["display_name"]
+    color_map = build_color_map(tapo_devices)
 
     # Gráficos principais
     col1, col2 = st.columns(2)
 
     with col1:
-        # Gráfico de consumo atual
-        fig_comparison = create_device_comparison_chart(devices_df)
+        fig_comparison = create_device_comparison_chart(
+            devices_df,
+            label_field="display_label",
+            color_map=color_map,
+        )
         st.plotly_chart(fig_comparison, use_container_width=True)
 
     with col2:
-        # Gráfico de distribuição
-        fig_pie = create_energy_pie_chart(devices_df)
+        fig_pie = create_energy_pie_chart(
+            devices_df,
+            label_field="display_label",
+            color_map=color_map,
+        )
         st.plotly_chart(fig_pie, use_container_width=True)
 
-    # Gráfico de histórico
+    # Histórico consolidado
     st.markdown("### 📊 Histórico de Consumo")
 
+    history_df = pd.DataFrame()
     if readings_data:
-        # Preparar dados para o gráfico
-        readings_df = pd.DataFrame(readings_data)
+        tapo_ids = {device["id"] for device in tapo_devices}
+        tapo_readings = [
+            reading for reading in readings_data if reading.get("device_id") in tapo_ids
+        ]
 
-        # Join com dispositivos para obter nomes
-        if not readings_df.empty:
-            readings_with_devices = []
-            for reading in readings_data:
-                device = next(
-                    (d for d in active_devices if d["id"] == reading["device_id"]), None
-                )
-                if device:
-                    reading["device_name"] = device["name"]
-                    readings_with_devices.append(reading)
+        if tapo_readings:
+            history_df = pd.DataFrame(tapo_readings)
+            history_df["timestamp"] = pd.to_datetime(
+                history_df["timestamp"], errors="coerce"
+            )
+            history_df = history_df.dropna(subset=["timestamp"])
+            history_df = history_df.sort_values("timestamp")
 
-            if readings_with_devices:
-                history_df = pd.DataFrame(readings_with_devices)
-                history_df["timestamp"] = pd.to_datetime(history_df["timestamp"])
+            start_time = datetime.now() - timedelta(days=time_range_days)
+            history_df = history_df[history_df["timestamp"] >= start_time]
 
-                fig_history = create_consumption_chart(
-                    history_df, "Histórico de Consumo (Últimas 100 leituras)"
-                )
-                st.plotly_chart(fig_history, use_container_width=True)
+            display_map = {d["id"]: d["display_name"] for d in tapo_devices}
+            profile_map = {d["id"]: d["profile_key"] for d in tapo_devices}
+            history_df["display_label"] = history_df["device_id"].map(display_map)
+            history_df["profile_key"] = history_df["device_id"].map(profile_map)
+            history_df = history_df.dropna(subset=["display_label"])
+
+    if not history_df.empty:
+        fig_history = create_consumption_chart(
+            history_df,
+            f"Histórico de Consumo (últimos {time_range_days} dia(s))",
+            color_field="display_label",
+            color_map=color_map,
+        )
+        st.plotly_chart(fig_history, use_container_width=True)
+    else:
+        st.info(
+            "Sem leituras recentes para os dispositivos TAPO no período selecionado."
+        )
 
     # Tabela de dispositivos
     st.markdown("### 📋 Detalhes dos Dispositivos")
 
-    # Preparar dados para exibição
     display_df = devices_df.copy()
+    display_df["Dispositivo"] = display_df["display_label"]
     display_df["Consumo Atual"] = display_df["current_power_watts"].apply(format_power)
     display_df["Status"] = display_df["is_active"].apply(
         lambda x: "🟢 Ativo" if x else "🔴 Inativo"
@@ -510,21 +686,19 @@ def render_tapo_dashboard():
             display_df["last_reading"]
         ).dt.strftime("%d/%m %H:%M")
 
-    # Selecionar colunas para exibição
-    display_columns = [
-        "name",
+    table_columns = [
+        "Dispositivo",
         "ip_address",
         "location",
         "equipment_connected",
         "Consumo Atual",
         "Status",
     ]
-    available_columns = [col for col in display_columns if col in display_df.columns]
+    available_columns = [col for col in table_columns if col in display_df.columns]
 
     st.dataframe(
         display_df[available_columns].rename(
             columns={
-                "name": "Dispositivo",
                 "ip_address": "IP",
                 "location": "Local",
                 "equipment_connected": "Equipamento",
@@ -533,7 +707,7 @@ def render_tapo_dashboard():
         use_container_width=True,
     )
 
-    # Projeções de consumo
+    # Projeções de consumo e custo
     st.markdown("### 📈 Projeções de Consumo e Custo")
 
     projections = []
@@ -546,7 +720,7 @@ def render_tapo_dashboard():
 
         projections.append(
             {
-                "Dispositivo": device["name"],
+                "Dispositivo": device["display_label"],
                 "Diário (kWh)": round(daily_energy, 2),
                 "Semanal (kWh)": round(weekly_energy, 2),
                 "Mensal (kWh)": round(monthly_energy, 2),
@@ -556,7 +730,6 @@ def render_tapo_dashboard():
 
     projections_df = pd.DataFrame(projections)
 
-    # Adicionar totais
     totals = projections_df.sum(numeric_only=True)
     totals["Dispositivo"] = "TOTAL"
     totals_df = pd.DataFrame([totals])
@@ -581,25 +754,149 @@ def render_tapo_dashboard():
 
     st.dataframe(style, use_container_width=True)
 
-    # Alertas e anomalias
-    st.markdown("### ⚠️ Monitoramento de Anomalias")
+    # Monitoramento individual por dispositivo
+    st.markdown("### 🔍 Monitoramento Individual por Dispositivo")
 
-    if devices_df["current_power_watts"].max() > 0:
-        avg_power = devices_df["current_power_watts"].mean()
-        std_power = devices_df["current_power_watts"].std()
-        threshold = avg_power + (std_power * 1.5 if std_power else avg_power * 0.5)
+    anomaly_summaries = []
+    if history_df.empty:
+        st.info(
+            "Sem leituras suficientes para detalhar os dispositivos TAPO no período selecionado."
+        )
+    else:
+        for device in tapo_devices:
+            device_id = device["id"]
+            display_name = device.get("display_name") or device.get("name")
+            profile_color = color_map.get(display_name, TAPO_COLOR_FALLBACK)
 
-        outliers = devices_df[devices_df["current_power_watts"] > threshold]
+            device_history = history_df[history_df["device_id"] == device_id].copy()
+            if device_history.empty:
+                st.info(f"{display_name}: ainda sem leituras recentes.")
+                continue
 
-        if not outliers.empty:
-            for _, device in outliers.iterrows():
-                st.warning(
-                    f"🚨 **{device['name']}** com consumo elevado: "
-                    f"{format_power(device['current_power_watts'])} "
-                    f"(média: {format_power(avg_power)})"
+            device_history = device_history.sort_values("timestamp")
+            device_history["power_watts"] = (
+                pd.to_numeric(device_history["power_watts"], errors="coerce")
+                .fillna(method="ffill")
+                .fillna(0)
+            )
+
+            if "energy_today_kwh" in device_history.columns:
+                device_history["energy_today_kwh"] = (
+                    pd.to_numeric(device_history["energy_today_kwh"], errors="coerce")
+                    .fillna(method="ffill")
+                    .fillna(0)
                 )
+                device_history["custo_estimado"] = (
+                    device_history["energy_today_kwh"] * tariff
+                )
+            else:
+                device_history["custo_estimado"] = pd.Series(dtype=float)
+
+            st.markdown(f"#### {display_name}")
+
+            col_metrics1, col_metrics2, col_metrics3, col_metrics4 = st.columns(4)
+
+            current_power = device.get("current_power_watts", 0)
+            col_metrics1.metric("Potência Atual", format_power(current_power))
+
+            last_timestamp = device_history["timestamp"].iloc[-1]
+            minutes_ago = max(
+                int((datetime.now() - last_timestamp).total_seconds() // 60), 0
+            )
+            col_metrics2.metric("Última Leitura", f"{minutes_ago} min")
+
+            energy_today = (
+                device_history["energy_today_kwh"].iloc[-1]
+                if "energy_today_kwh" in device_history.columns
+                else float("nan")
+            )
+            if pd.notna(energy_today):
+                col_metrics3.metric("Energia Hoje", f"{energy_today:.3f} kWh")
+            else:
+                col_metrics3.metric("Energia Hoje", "-")
+
+            cost_today = (
+                device_history["custo_estimado"].iloc[-1]
+                if "custo_estimado" in device_history.columns
+                and not device_history["custo_estimado"].isna().all()
+                else float("nan")
+            )
+            if pd.notna(cost_today):
+                col_metrics4.metric("Custo Estimado", format_cost(cost_today))
+            else:
+                col_metrics4.metric("Custo Estimado", "-")
+
+            power_series = device_history["power_watts"]
+            avg_power = power_series.mean()
+            std_power = power_series.std()
+            peak_power = power_series.max()
+            threshold = avg_power + (std_power * 2 if std_power else avg_power * 0.5)
+            spike_points = device_history[power_series > threshold]
+
+            if not spike_points.empty:
+                peak_time = spike_points["timestamp"].iloc[-1].strftime("%d/%m %H:%M")
+                msg = (
+                    f"{display_name}: {len(spike_points)} pico(s) acima de {threshold:.1f} W "
+                    f"(máximo {peak_power:.1f} W às {peak_time})."
+                )
+                anomaly_summaries.append((True, msg))
+                st.warning(f"⚠️ {msg}")
+            else:
+                msg = f"{display_name}: consumo estável (média {avg_power:.1f} W, pico {peak_power:.1f} W)."
+                anomaly_summaries.append((False, msg))
+                st.success(f"✅ {msg}")
+
+            col_chart1, col_chart2 = st.columns(2)
+
+            fig_power = create_single_device_line(
+                device_history,
+                "power_watts",
+                "Potência Instantânea (W)",
+                profile_color,
+                "W",
+            )
+            col_chart1.plotly_chart(fig_power, use_container_width=True)
+
+            if "energy_today_kwh" in device_history.columns:
+                fig_energy = create_single_device_line(
+                    device_history,
+                    "energy_today_kwh",
+                    "Energia acumulada no dia (kWh)",
+                    profile_color,
+                    "kWh",
+                )
+                col_chart2.plotly_chart(fig_energy, use_container_width=True)
+            else:
+                col_chart2.info("Sem dados de energia acumulada para este dispositivo.")
+
+            if (
+                "custo_estimado" in device_history.columns
+                and not device_history["custo_estimado"].isna().all()
+            ):
+                fig_cost = create_single_device_line(
+                    device_history,
+                    "custo_estimado",
+                    "Custo estimado acumulado (R$)",
+                    profile_color,
+                    "R$",
+                )
+                st.plotly_chart(fig_cost, use_container_width=True)
+
+            st.markdown("---")
+
+    # Resumo de anomalias
+    st.markdown("### ⚠️ Monitoramento de Anomalias")
+    if not anomaly_summaries:
+        st.info("Sem leituras para análise de anomalias.")
+    else:
+        spikes = [msg for has_spike, msg in anomaly_summaries if has_spike]
+        if spikes:
+            for msg in spikes:
+                st.warning(msg)
         else:
-            st.success("✅ Nenhum pico de consumo detectado")
+            st.success(
+                "Nenhum pico de consumo detectado nos dispositivos TAPO no período selecionado."
+            )
 
     # Status da conexão
     st.markdown("---")
@@ -612,7 +909,9 @@ def render_tapo_dashboard():
         st.metric("🔄 Última Sincronização", datetime.now().strftime("%H:%M:%S"))
 
     with col3:
-        st.metric("📈 Total de Leituras", len(readings_data) if readings_data else 0)
+        st.metric(
+            "📈 Total de Leituras", len(history_df) if not history_df.empty else 0
+        )
 
 
 def load_smartlife_data() -> dict:
