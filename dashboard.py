@@ -393,9 +393,61 @@ def render_tapo_dashboard():
     # Converter para DataFrame
     devices_df = pd.DataFrame(active_devices)
 
+    if devices_df.empty:
+        st.warning("⚠️ Não há dados dos dispositivos para exibir.")
+        return
+
     # Adicionar coluna device_name se não existir (compatibilidade)
     if "name" in devices_df.columns and "device_name" not in devices_df.columns:
         devices_df["device_name"] = devices_df["name"]
+
+    # Garantir coluna de potência atual
+    if "current_power_watts" not in devices_df.columns:
+        devices_df["current_power_watts"] = 0.0
+
+    # Se existirem leituras, utilizar última leitura por dispositivo
+    if readings_data:
+        readings_df_latest = (
+            pd.DataFrame(readings_data)
+            .sort_values("timestamp")
+            .drop_duplicates("device_id", keep="last")
+        )
+
+        if not readings_df_latest.empty:
+            readings_df_latest["timestamp"] = pd.to_datetime(
+                readings_df_latest["timestamp"]
+            )
+
+            readings_df_latest = readings_df_latest.rename(
+                columns={
+                    "device_id": "reading_device_id",
+                    "power_watts": "reading_power_watts",
+                }
+            )
+
+            devices_df = devices_df.merge(
+                readings_df_latest[["reading_device_id", "reading_power_watts"]],
+                how="left",
+                left_on="id",
+                right_on="reading_device_id",
+            )
+
+            devices_df["current_power_watts"] = devices_df[
+                "reading_power_watts"
+            ].fillna(devices_df["current_power_watts"])
+
+            devices_df.drop(
+                columns=[
+                    col
+                    for col in ["reading_device_id", "reading_power_watts"]
+                    if col in devices_df.columns
+                ],
+                inplace=True,
+            )
+
+    devices_df["current_power_watts"] = pd.to_numeric(
+        devices_df["current_power_watts"], errors="coerce"
+    ).fillna(0.0)
 
     # Cards de resumo
     build_summary_cards(active_devices, readings_data or [])
