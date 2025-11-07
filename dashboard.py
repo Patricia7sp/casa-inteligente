@@ -522,7 +522,9 @@ def render_tapo_dashboard():
     # Filtrar apenas dispositivos TAPO relevantes
     tapo_devices = []
     for device in devices_data:
-        if not device.get("is_active"):
+        # Aceitar dispositivos TAPO mesmo se is_active for None ou True
+        is_active = device.get("is_active")
+        if is_active is False:
             continue
 
         profile_key = classify_tapo_device(device)
@@ -536,6 +538,9 @@ def render_tapo_dashboard():
             device["profile_key"] = profile_key
             device["profile_label"] = profile_label
             device["display_name"] = f"{icon} {profile_label}"
+            # Garantir que is_active seja True para compatibilidade
+            if device.get("is_active") is None:
+                device["is_active"] = True
             tapo_devices.append(device)
 
     if not tapo_devices:
