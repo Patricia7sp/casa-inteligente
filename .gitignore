@@ -227,3 +227,5 @@ logs/*.log
 # Arquivos HTML baixados
 *.html
 !docs/**/*.html
+
+.databricks

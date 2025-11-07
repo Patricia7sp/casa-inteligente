@@ -93,7 +93,10 @@ st.markdown(
 # Configuração da API - Usar Supabase como fonte principal
 API_BASE_URL = os.getenv("API_BASE_URL", "http://localhost:8000")
 SUPABASE_URL = os.getenv("SUPABASE_URL", "https://pqqrodiuuhckvdqawgeg.supabase.co")
-SUPABASE_KEY = os.getenv("SUPABASE_ANON_KEY", "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InBxcXJvZGl1dWhja3ZkcWF3Z2VnIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjI0OTI0MTIsImV4cCI6MjA3ODA2ODQxMn0.ve7NIbFcZdTGa16O3Pttmpx2mxWgklvbPwwTSCHuDFs")
+SUPABASE_KEY = os.getenv(
+    "SUPABASE_ANON_KEY",
+    "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InBxcXJvZGl1dWhja3ZkcWF3Z2VnIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjI0OTI0MTIsImV4cCI6MjA3ODA2ODQxMn0.ve7NIbFcZdTGa16O3Pttmpx2mxWgklvbPwwTSCHuDFs",
+)
 
 # Título da aplicação
 st.markdown(
@@ -151,9 +154,9 @@ def get_supabase_data(endpoint, params=None):
         headers = {
             "apikey": SUPABASE_KEY,
             "Authorization": f"Bearer {SUPABASE_KEY}",
-            "Content-Type": "application/json"
+            "Content-Type": "application/json",
         }
-        
+
         response = requests.get(url, headers=headers, params=params)
         if response.status_code == 200:
             return response.json()
@@ -200,16 +203,18 @@ def format_cost(value):
 def build_summary_cards(devices_data, readings_data):
     """Construir cards de resumo"""
     col1, col2, col3, col4 = st.columns(4)
-    
+
     # Calcular métricas
-    total_power = sum(d.get('current_power_watts', 0) for d in devices_data if d.get('is_active'))
-    active_devices = sum(1 for d in devices_data if d.get('is_active'))
+    total_power = sum(
+        d.get("current_power_watts", 0) for d in devices_data if d.get("is_active")
+    )
+    active_devices = sum(1 for d in devices_data if d.get("is_active"))
     total_devices = len(devices_data)
-    
+
     # Última leitura
     last_reading = "N/A"
     if readings_data:
-        last_timestamp = max(r.get('timestamp') for r in readings_data)
+        last_timestamp = max(r.get("timestamp") for r in readings_data)
         if last_timestamp:
             time_diff = datetime.now() - pd.to_datetime(last_timestamp)
             last_reading = f"{max(time_diff.seconds // 60, 0)} min atrás"
@@ -228,7 +233,10 @@ def build_summary_cards(devices_data, readings_data):
 
     with col3:
         status_icon = "🟢" if active_devices > 0 else "🔴"
-        st.metric(label="📈 Status Sistema", value=f"{status_icon} {'Ativo' if active_devices > 0 else 'Inativo'}")
+        st.metric(
+            label="📈 Status Sistema",
+            value=f"{status_icon} {'Ativo' if active_devices > 0 else 'Inativo'}",
+        )
 
     with col4:
         st.metric(
@@ -239,34 +247,36 @@ def build_summary_cards(devices_data, readings_data):
 
 def create_power_gauge(value, title, max_value=100):
     """Criar gráfico gauge para potência"""
-    fig = go.Figure(go.Indicator(
-        mode = "gauge+number+delta",
-        value = value,
-        domain = {'x': [0, 1], 'y': [0, 1]},
-        title = {'text': title},
-        delta = {'reference': max_value * 0.8},
-        gauge = {
-            'axis': {'range': [None, max_value]},
-            'bar': {'color': "#667eea"},
-            'steps': [
-                {'range': [0, max_value * 0.5], 'color': "lightgray"},
-                {'range': [max_value * 0.5, max_value * 0.8], 'color': "gray"}
-            ],
-            'threshold': {
-                'line': {'color': "red", 'width': 4},
-                'thickness': 0.75,
-                'value': max_value * 0.9
-            }
-        }
-    ))
-    
+    fig = go.Figure(
+        go.Indicator(
+            mode="gauge+number+delta",
+            value=value,
+            domain={"x": [0, 1], "y": [0, 1]},
+            title={"text": title},
+            delta={"reference": max_value * 0.8},
+            gauge={
+                "axis": {"range": [None, max_value]},
+                "bar": {"color": "#667eea"},
+                "steps": [
+                    {"range": [0, max_value * 0.5], "color": "lightgray"},
+                    {"range": [max_value * 0.5, max_value * 0.8], "color": "gray"},
+                ],
+                "threshold": {
+                    "line": {"color": "red", "width": 4},
+                    "thickness": 0.75,
+                    "value": max_value * 0.9,
+                },
+            },
+        )
+    )
+
     fig.update_layout(
         height=300,
         plot_bgcolor="rgba(0,0,0,0)",
         paper_bgcolor="rgba(0,0,0,0)",
         font_color="#ffffff",
     )
-    
+
     return fig
 
 
@@ -281,24 +291,18 @@ def create_consumption_chart(df, title):
         markers=True,
         color_discrete_sequence=["#667eea", "#764ba2", "#f093fb", "#f5576c"],
     )
-    
+
     fig.update_layout(
         height=400,
         plot_bgcolor="rgba(0,0,0,0)",
         paper_bgcolor="rgba(0,0,0,0)",
         font_color="#ffffff",
         showlegend=True,
-        legend=dict(
-            orientation="h",
-            yanchor="bottom",
-            y=1.02,
-            xanchor="right",
-            x=1
-        )
+        legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1),
     )
-    
+
     fig.update_traces(line=dict(width=3))
-    
+
     return fig
 
 
@@ -312,7 +316,7 @@ def create_device_comparison_chart(devices_df):
         title="Consumo Atual por Dispositivo",
         color_discrete_sequence=["#667eea", "#764ba2", "#f093fb", "#f5576c"],
     )
-    
+
     fig.update_layout(
         height=400,
         plot_bgcolor="rgba(0,0,0,0)",
@@ -320,13 +324,13 @@ def create_device_comparison_chart(devices_df):
         font_color="#ffffff",
         showlegend=False,
     )
-    
+
     fig.update_traces(
-        marker=dict(line=dict(color='rgba(255,255,255,0.2)', width=1)),
-        texttemplate='%{y:.1f}W',
-        textposition='outside'
+        marker=dict(line=dict(color="rgba(255,255,255,0.2)", width=1)),
+        texttemplate="%{y:.1f}W",
+        textposition="outside",
     )
-    
+
     return fig
 
 
@@ -339,7 +343,7 @@ def create_energy_pie_chart(devices_df):
         title="Distribuição de Consumo",
         color_discrete_sequence=["#667eea", "#764ba2", "#f093fb", "#f5576c"],
     )
-    
+
     fig.update_layout(
         height=400,
         plot_bgcolor="rgba(0,0,0,0)",
@@ -347,30 +351,29 @@ def create_energy_pie_chart(devices_df):
         font_color="#ffffff",
         showlegend=True,
     )
-    
+
     fig.update_traces(
-        textposition='inside',
-        textinfo='percent+label',
-        marker=dict(line=dict(color='rgba(255,255,255,0.2)', width=1))
+        textposition="inside",
+        textinfo="percent+label",
+        marker=dict(line=dict(color="rgba(255,255,255,0.2)", width=1)),
     )
-    
+
     return fig
 
 
 def render_tapo_dashboard():
     """Renderizar dashboard principal TP-Link Tapo"""
-    
+
     # Obter dados do Supabase
     devices_data = get_supabase_data("devices")
-    readings_data = get_supabase_data("energy_readings", params={
-        "order": "timestamp.desc",
-        "limit": "100"
-    })
-    
+    readings_data = get_supabase_data(
+        "energy_readings", params={"order": "timestamp.desc", "limit": "100"}
+    )
+
     if not devices_data:
         st.error("❌ Não foi possível carregar os dispositivos do Supabase")
         st.info("🔍 Verificando conexão...")
-        
+
         # Tentar API local como fallback
         realtime_data = get_api_data("/status/realtime")
         if realtime_data and "devices" in realtime_data:
@@ -379,134 +382,152 @@ def render_tapo_dashboard():
         else:
             st.error("❌ Falha em todas as fontes de dados")
             return
-    
+
     # Filtrar apenas dispositivos ativos
-    active_devices = [d for d in devices_data if d.get('is_active')]
-    
+    active_devices = [d for d in devices_data if d.get("is_active")]
+
     if not active_devices:
         st.warning("⚠️ Nenhum dispositivo TAPO ativo encontrado")
         return
-    
+
     # Converter para DataFrame
     devices_df = pd.DataFrame(active_devices)
-    
+
     # Cards de resumo
     build_summary_cards(active_devices, readings_data or [])
-    
+
     st.markdown("---")
-    
+
     # Gráficos principais
     col1, col2 = st.columns(2)
-    
+
     with col1:
         # Gráfico de consumo atual
         fig_comparison = create_device_comparison_chart(devices_df)
         st.plotly_chart(fig_comparison, use_container_width=True)
-    
+
     with col2:
         # Gráfico de distribuição
         fig_pie = create_energy_pie_chart(devices_df)
         st.plotly_chart(fig_pie, use_container_width=True)
-    
+
     # Gráfico de histórico
     st.markdown("### 📊 Histórico de Consumo")
-    
+
     if readings_data:
         # Preparar dados para o gráfico
         readings_df = pd.DataFrame(readings_data)
-        
+
         # Join com dispositivos para obter nomes
         if not readings_df.empty:
             readings_with_devices = []
             for reading in readings_data:
-                device = next((d for d in active_devices if d['id'] == reading['device_id']), None)
+                device = next(
+                    (d for d in active_devices if d["id"] == reading["device_id"]), None
+                )
                 if device:
-                    reading['device_name'] = device['name']
+                    reading["device_name"] = device["name"]
                     readings_with_devices.append(reading)
-            
+
             if readings_with_devices:
                 history_df = pd.DataFrame(readings_with_devices)
-                history_df['timestamp'] = pd.to_datetime(history_df['timestamp'])
-                
+                history_df["timestamp"] = pd.to_datetime(history_df["timestamp"])
+
                 fig_history = create_consumption_chart(
-                    history_df, 
-                    "Histórico de Consumo (Últimas 100 leituras)"
+                    history_df, "Histórico de Consumo (Últimas 100 leituras)"
                 )
                 st.plotly_chart(fig_history, use_container_width=True)
-    
+
     # Tabela de dispositivos
     st.markdown("### 📋 Detalhes dos Dispositivos")
-    
+
     # Preparar dados para exibição
     display_df = devices_df.copy()
     display_df["Consumo Atual"] = display_df["current_power_watts"].apply(format_power)
-    display_df["Status"] = display_df["is_active"].apply(lambda x: "🟢 Ativo" if x else "🔴 Inativo")
-    
-    if 'last_reading' in display_df.columns:
-        display_df["Última Leitura"] = pd.to_datetime(display_df["last_reading"]).dt.strftime("%d/%m %H:%M")
-    
+    display_df["Status"] = display_df["is_active"].apply(
+        lambda x: "🟢 Ativo" if x else "🔴 Inativo"
+    )
+
+    if "last_reading" in display_df.columns:
+        display_df["Última Leitura"] = pd.to_datetime(
+            display_df["last_reading"]
+        ).dt.strftime("%d/%m %H:%M")
+
     # Selecionar colunas para exibição
-    display_columns = ["name", "ip_address", "location", "equipment_connected", "Consumo Atual", "Status"]
+    display_columns = [
+        "name",
+        "ip_address",
+        "location",
+        "equipment_connected",
+        "Consumo Atual",
+        "Status",
+    ]
     available_columns = [col for col in display_columns if col in display_df.columns]
-    
+
     st.dataframe(
-        display_df[available_columns].rename(columns={
-            "name": "Dispositivo",
-            "ip_address": "IP",
-            "location": "Local",
-            "equipment_connected": "Equipamento",
-        }),
+        display_df[available_columns].rename(
+            columns={
+                "name": "Dispositivo",
+                "ip_address": "IP",
+                "location": "Local",
+                "equipment_connected": "Equipamento",
+            }
+        ),
         use_container_width=True,
     )
-    
+
     # Projeções de consumo
     st.markdown("### 📈 Projeções de Consumo e Custo")
-    
+
     projections = []
     for _, device in devices_df.iterrows():
-        current_power = device.get('current_power_watts', 0)
+        current_power = device.get("current_power_watts", 0)
         daily_energy = current_power * 24 / 1000
         weekly_energy = daily_energy * 7
         monthly_energy = daily_energy * 30
         monthly_cost = monthly_energy * tariff
-        
-        projections.append({
-            "Dispositivo": device['name'],
-            "Diário (kWh)": round(daily_energy, 2),
-            "Semanal (kWh)": round(weekly_energy, 2),
-            "Mensal (kWh)": round(monthly_energy, 2),
-            "Custo Mensal (R$)": round(monthly_cost, 2),
-        })
-    
+
+        projections.append(
+            {
+                "Dispositivo": device["name"],
+                "Diário (kWh)": round(daily_energy, 2),
+                "Semanal (kWh)": round(weekly_energy, 2),
+                "Mensal (kWh)": round(monthly_energy, 2),
+                "Custo Mensal (R$)": round(monthly_cost, 2),
+            }
+        )
+
     projections_df = pd.DataFrame(projections)
-    
+
     # Adicionar totais
     totals = projections_df.sum(numeric_only=True)
     totals["Dispositivo"] = "TOTAL"
     totals_df = pd.DataFrame([totals])
-    
+
     final_df = pd.concat([projections_df, totals_df], ignore_index=True)
-    
+
     st.dataframe(
-        final_df.style.format({
-            "Diário (kWh)": "{:.2f}",
-            "Semanal (kWh)": "{:.2f}",
-            "Mensal (kWh)": "{:.2f}",
-            "Custo Mensal (R$)": "R$ {:.2f}",
-        }).background_gradient(subset=["Custo Mensal (R$)"], cmap="Reds"),
+        final_df.style.format(
+            {
+                "Diário (kWh)": "{:.2f}",
+                "Semanal (kWh)": "{:.2f}",
+                "Mensal (kWh)": "{:.2f}",
+                "Custo Mensal (R$)": "R$ {:.2f}",
+            }
+        ).background_gradient(subset=["Custo Mensal (R$)"], cmap="Reds"),
         use_container_width=True,
     )
-    
+
     # Alertas e anomalias
     st.markdown("### ⚠️ Monitoramento de Anomalias")
-    
-    if devices_df['current_power_watts'].max() > 0:
-        avg_power = devices_df['current_power_watts'].mean()
-        std_power = devices_df['current_power_watts'].std()
+
+    if devices_df["current_power_watts"].max() > 0:
+        avg_power = devices_df["current_power_watts"].mean()
+        std_power = devices_df["current_power_watts"].std()
         threshold = avg_power + (std_power * 1.5 if std_power else avg_power * 0.5)
-        
-        outliers = devices_df[devices_df['current_power_watts'] > threshold]
-        
+
+        outliers = devices_df[devices_df["current_power_watts"] > threshold]
+
         if not outliers.empty:
             for _, device in outliers.iterrows():
                 st.warning(
@@ -516,25 +537,171 @@ def render_tapo_dashboard():
                 )
         else:
             st.success("✅ Nenhum pico de consumo detectado")
-    
+
     # Status da conexão
     st.markdown("---")
     col1, col2, col3 = st.columns(3)
-    
+
     with col1:
         st.metric("📊 Fonte de Dados", "Supabase" if devices_data else "API Local")
-    
+
     with col2:
         st.metric("🔄 Última Sincronização", datetime.now().strftime("%H:%M:%S"))
-    
+
     with col3:
         st.metric("📈 Total de Leituras", len(readings_data) if readings_data else 0)
 
 
-# Fluxo principal
-render_tapo_dashboard()
+def load_smartlife_data() -> dict:
+    """Carregar dados SmartLife"""
+    smartlife_file = Path("data/smartlife/latest.json")
+    if smartlife_file.exists():
+        try:
+            with open(smartlife_file, "r", encoding="utf-8") as f:
+                return json.load(f)
+        except json.JSONDecodeError:
+            st.error("Arquivo SmartLife inválido. Execute o polling novamente.")
+    return {}
 
-# Auto refresh
+
+def render_smartlife_dashboard(smartlife_data: dict):
+    """Renderizar dashboard SmartLife"""
+    if not smartlife_data:
+        st.info(
+            "📧 Aguardando dados SmartLife. Execute `python scripts/gmail_polling.py`."
+        )
+        return
+
+    metrics = smartlife_data.get("metrics", {})
+
+    st.markdown("### 🔍 Visão Geral")
+    col1, col2, col3, col4 = st.columns(4)
+    col1.metric("⚡ Consumo Diário", f"{metrics.get('daily_average_kwh', 0):.2f} kWh")
+    col2.metric(
+        "💰 Custo Mensal Estimado",
+        f"R$ {metrics.get('estimated_monthly_cost_brl', 0):.2f}",
+    )
+    col3.metric(
+        "📆 Projeção Mensal", f"{metrics.get('monthly_projection_kwh', 0):.1f} kWh"
+    )
+    status = metrics.get("status", "normal")
+    col4.metric("🚦 Status", "🟢 Normal" if status == "normal" else "⚠️ Atenção")
+
+    st.markdown("### 📊 Consumo Semanal")
+    weekly_data = metrics.get("weekly_consumption_kwh", [])
+    if weekly_data:
+        df_week = pd.DataFrame(weekly_data)
+        fig_week = px.line(
+            df_week,
+            x="date",
+            y="consumption",
+            markers=True,
+            title="Consumo Diário (kWh)",
+            color_discrete_sequence=["#667eea"],
+        )
+        fig_week.update_layout(
+            plot_bgcolor="rgba(0,0,0,0)",
+            paper_bgcolor="rgba(0,0,0,0)",
+            font_color="#ffffff",
+        )
+        st.plotly_chart(fig_week, use_container_width=True)
+
+    st.markdown("### 🏷️ Classificação do Mês")
+    consumption_rank = metrics.get("consumption_rank", [])
+    if consumption_rank:
+        st.dataframe(pd.DataFrame(consumption_rank), use_container_width=True)
+
+    st.markdown("### 🕒 Duração do Dispositivo")
+    runtime_info = metrics.get("runtime_hours", {})
+    if runtime_info:
+        runtime_df = pd.DataFrame(
+            [
+                {
+                    "Período": period,
+                    "Horas": hours,
+                }
+                for period, hours in runtime_info.items()
+            ]
+        )
+        fig_runtime = px.bar(
+            runtime_df,
+            x="Período",
+            y="Horas",
+            title="Tempo de Uso (h)",
+            color_discrete_sequence=["#764ba2"],
+        )
+        fig_runtime.update_layout(
+            plot_bgcolor="rgba(0,0,0,0)",
+            paper_bgcolor="rgba(0,0,0,0)",
+            font_color="#ffffff",
+        )
+        st.plotly_chart(fig_runtime, use_container_width=True)
+
+    st.markdown("### 📌 Recomendações")
+    recommendations = smartlife_data.get("recommendations", [])
+    if recommendations:
+        for rec in recommendations:
+            st.write(f"- {rec}")
+    else:
+        st.info("Nenhuma recomendação adicional no momento.")
+
+
+def render_chat_assistant():
+    """Renderizar assistente de IA"""
+    st.markdown("### 🤖 Assistente de Energia")
+
+    if "chat_history" not in st.session_state:
+        st.session_state.chat_history = []
+
+    provider = st.selectbox("Modelo", ["auto", "openai", "gemini"], index=0)
+    question = st.text_input(
+        "Pergunte sobre seu consumo ou custos", "Como foi meu consumo hoje?"
+    )
+
+    if st.button("Enviar pergunta", type="primary"):
+        if question.strip():
+            st.session_state.chat_history.append({"role": "user", "content": question})
+            try:
+                response = requests.post(
+                    f"{API_BASE_URL}/ai/ask",
+                    json={"question": question, "provider": provider},
+                    timeout=60,
+                )
+                if response.status_code == 200:
+                    data = response.json()
+                    st.session_state.chat_history.append(
+                        {
+                            "role": "assistant",
+                            "content": data.get("response", "Sem resposta."),
+                        }
+                    )
+                else:
+                    st.error("Falha ao consultar o assistente.")
+            except requests.exceptions.RequestException as exc:
+                st.error(f"Erro ao conectar ao assistente: {exc}")
+
+    for message in st.session_state.chat_history[-10:]:
+        with st.chat_message(message["role"]):
+            st.write(message["content"])
+
+
+# Fluxo principal com tabs
+smartlife_data = load_smartlife_data()
+
+tab_tapo, tab_smartlife, tab_assistant = st.tabs(
+    ["🔌 TP-Link Tapo", "📱 SmartLife", "🤖 Assistente"]
+)
+
+with tab_tapo:
+    render_tapo_dashboard()
+
+with tab_smartlife:
+    render_smartlife_dashboard(smartlife_data)
+
+with tab_assistant:
+    render_chat_assistant()
+
+# Auto refresh apenas na aba principal
 if auto_refresh:
     time.sleep(refresh_interval)
     st.rerun()
@@ -544,7 +711,7 @@ st.markdown("---")
 st.markdown(
     """
     <div style='text-align: center; color: gray; padding: 20px;'>
-        🔌 TP-Link Tapo Dashboard | Casa Inteligente System
+        🏠 Casa Inteligente Dashboard | Desenvolvido com ❤️ por Patricia Menezes
     </div>
     """,
     unsafe_allow_html=True,
