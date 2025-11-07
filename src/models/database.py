@@ -105,7 +105,23 @@ class Alert(Base):
 
 
 # Configuração do banco de dados
-engine = create_engine(settings.database_url)
+# Adicionar configurações para Supabase
+engine_args = {
+    "pool_pre_ping": True,  # Verificar conexão antes de usar
+    "pool_recycle": 300,  # Reciclar conexões a cada 5 minutos
+    "pool_size": 5,
+    "max_overflow": 10,
+    "connect_args": {
+        "connect_timeout": 10,
+        "options": "-c timezone=utc"
+    }
+}
+
+# Se for Supabase, adicionar SSL
+if "supabase.co" in settings.database_url:
+    engine_args["connect_args"]["sslmode"] = "require"
+
+engine = create_engine(settings.database_url, **engine_args)
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 
 
