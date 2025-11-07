@@ -6,6 +6,7 @@ import os
 import json
 import time
 import math
+import importlib.util
 from pathlib import Path
 from datetime import datetime, timedelta
 
@@ -562,17 +563,23 @@ def render_tapo_dashboard():
 
     final_df = pd.concat([projections_df, totals_df], ignore_index=True)
 
-    st.dataframe(
-        final_df.style.format(
-            {
-                "Diário (kWh)": "{:.2f}",
-                "Semanal (kWh)": "{:.2f}",
-                "Mensal (kWh)": "{:.2f}",
-                "Custo Mensal (R$)": "R$ {:.2f}",
-            }
-        ).background_gradient(subset=["Custo Mensal (R$)"], cmap="Reds"),
-        use_container_width=True,
+    style = final_df.style.format(
+        {
+            "Diário (kWh)": "{:.2f}",
+            "Semanal (kWh)": "{:.2f}",
+            "Mensal (kWh)": "{:.2f}",
+            "Custo Mensal (R$)": "R$ {:.2f}",
+        }
     )
+
+    if importlib.util.find_spec("matplotlib"):
+        style = style.background_gradient(subset=["Custo Mensal (R$)"], cmap="Reds")
+    else:
+        st.info(
+            "ℹ️ Instale matplotlib para habilitar destaque de gradiente na tabela de projeções."
+        )
+
+    st.dataframe(style, use_container_width=True)
 
     # Alertas e anomalias
     st.markdown("### ⚠️ Monitoramento de Anomalias")
