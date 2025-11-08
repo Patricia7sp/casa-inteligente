@@ -103,17 +103,22 @@ class LLMService:
             if not devices:
                 return "Não foi possível acessar os dados dos dispositivos. Tente novamente."
 
-            # Buscar leituras de energia de hoje
+            # Buscar todas as leituras recentes (últimas 1000) ordenadas por timestamp
+            all_readings = self._get_supabase_data(
+                "energy_readings",
+                params={"order": "timestamp.desc", "limit": "1000"},
+            )
+
+            # Buscar leituras de hoje para cálculo de energia
             today_start = datetime.utcnow().replace(
                 hour=0, minute=0, second=0, microsecond=0
             )
-            readings = self._get_supabase_data(
-                "energy_readings",
-                params={
-                    "timestamp": f"gte.{today_start.isoformat()}",
-                    "order": "timestamp.desc",
-                },
-            )
+            readings_today = [
+                r
+                for r in all_readings
+                if datetime.fromisoformat(r.get("timestamp", "").replace("Z", "+00:00"))
+                >= today_start
+            ]
 
             context = f"""
 Você é o assistente inteligente da Casa Inteligente, um sistema de monitoramento de consumo de energia residencial do usuário.
@@ -140,24 +145,35 @@ DISPOSITIVOS DO USUÁRIO (MONITORADOS NESTE SISTEMA):
                 location = device.get("location", "N/A")
                 device_type = device.get("type", "N/A")
 
-                # Buscar última leitura deste dispositivo
-                device_readings = [
-                    r for r in readings if r.get("device_id") == device_id
+                # Buscar última leitura deste dispositivo (de todas as leituras)
+                device_all_readings = [
+                    r for r in all_readings if r.get("device_id") == device_id
                 ]
+
+                # Buscar leituras de hoje deste dispositivo
+                device_readings_today = [
+                    r for r in readings_today if r.get("device_id") == device_id
+                ]
+
                 current_power = 0
                 energy_today = 0
+                last_reading_time = None
 
-                if device_readings:
-                    # Última leitura
-                    latest = device_readings[0]
+                # Usar a última leitura disponível (não apenas de hoje)
+                if device_all_readings:
+                    latest = device_all_readings[0]
                     current_power = latest.get("power_watts", 0)
-
-                    # Somar energia de hoje
-                    energy_today = sum(r.get("energy_kwh", 0) for r in device_readings)
+                    last_reading_time = latest.get("timestamp", "")
 
                     total_power += current_power
                     if current_power > 0:
                         active_count += 1
+
+                # Calcular energia apenas de hoje
+                if device_readings_today:
+                    energy_today = sum(
+                        r.get("energy_kwh", 0) for r in device_readings_today
+                    )
 
                 device_consumption.append(
                     {
@@ -171,12 +187,39 @@ DISPOSITIVOS DO USUÁRIO (MONITORADOS NESTE SISTEMA):
                 )
 
                 status_icon = "🟢 Ligado" if current_power > 0 else "🔴 Desligado"
+
+                # Formatar tempo da última leitura
+                last_reading_info = ""
+                if last_reading_time:
+                    try:
+                        last_time = datetime.fromisoformat(
+                            last_reading_time.replace("Z", "+00:00")
+                        )
+                        time_diff = (
+                            datetime.utcnow().replace(tzinfo=last_time.tzinfo)
+                            - last_time
+                        )
+                        if time_diff.total_seconds() < 3600:
+                            last_reading_info = (
+                                f" (há {int(time_diff.total_seconds() / 60)} min)"
+                            )
+                        elif time_diff.total_seconds() < 86400:
+                            last_reading_info = (
+                                f" (há {int(time_diff.total_seconds() / 3600)} h)"
+                            )
+                        else:
+                            last_reading_info = (
+                                f" (há {int(time_diff.total_seconds() / 86400)} dias)"
+                            )
+                    except:
+                        pass
+
                 context += f"""
 - {device_name}:
   • Equipamento: {equipment}
   • Local: {location}
   • Tipo: {device_type}
-  • Consumo Atual: {current_power:.2f} W
+  • Consumo Atual: {current_power:.2f} W{last_reading_info}
   • Energia Hoje: {energy_today:.3f} kWh
   • Status: {status_icon}
 """
