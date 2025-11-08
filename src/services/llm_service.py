@@ -110,15 +110,39 @@ class LLMService:
             )
 
             # Buscar leituras de hoje para cálculo de energia
-            today_start = datetime.utcnow().replace(
-                hour=0, minute=0, second=0, microsecond=0
-            )
+            now = datetime.utcnow()
+            today_start = now.replace(hour=0, minute=0, second=0, microsecond=0)
             readings_today = [
                 r
                 for r in all_readings
                 if datetime.fromisoformat(r.get("timestamp", "").replace("Z", "+00:00"))
                 >= today_start
             ]
+
+            # Calcular informações sobre atualização dos dados
+            data_freshness = ""
+            latest_reading_time = None
+            if all_readings:
+                latest_reading_time = datetime.fromisoformat(
+                    all_readings[0].get("timestamp", "").replace("Z", "+00:00")
+                )
+                time_since_update = (
+                    now.replace(tzinfo=latest_reading_time.tzinfo) - latest_reading_time
+                ).total_seconds()
+
+                if time_since_update < 900:  # < 15 min
+                    data_freshness = f"✅ Dados atualizados há {int(time_since_update / 60)} minutos (sistema coletando normalmente)"
+                elif time_since_update < 3600:  # < 1h
+                    data_freshness = f"⚠️ Última atualização há {int(time_since_update / 60)} minutos (possível atraso na coleta)"
+                elif time_since_update < 86400:  # < 24h
+                    data_freshness = f"⚠️ Última atualização há {int(time_since_update / 3600)} horas (sistema de coleta pode estar parado)"
+                else:
+                    days = int(time_since_update / 86400)
+                    data_freshness = f"❌ Última atualização há {days} dia(s) - Sistema de coleta NÃO está funcionando"
+            else:
+                data_freshness = (
+                    "❌ Nenhuma leitura disponível - Sistema ainda não coletou dados"
+                )
 
             context = f"""
 Você é o assistente inteligente da Casa Inteligente, um sistema de monitoramento de consumo de energia residencial do usuário.
@@ -127,8 +151,18 @@ IMPORTANTE: Quando o usuário perguntar sobre "dispositivos", "consumo" ou "gast
 SEMPRE se refira aos dispositivos DESTE SISTEMA listados abaixo. Estes são OS DISPOSITIVOS DO USUÁRIO.
 
 CONTEXTO ATUAL DO SISTEMA:
-- Data/Hora: {datetime.utcnow().strftime('%d/%m/%Y %H:%M:%S')}
+- Data/Hora Atual: {now.strftime('%d/%m/%Y %H:%M:%S UTC')}
 - Dispositivos Monitorados: {len(devices)}
+- Total de Leituras no Banco: {len(all_readings)}
+- Leituras de Hoje: {len(readings_today)}
+- Status da Coleta: {data_freshness}
+- Última Leitura: {latest_reading_time.strftime('%d/%m/%Y %H:%M:%S') if latest_reading_time else 'Nenhuma'}
+
+IMPORTANTE SOBRE OS DADOS:
+- O sistema coleta dados automaticamente a cada 15 minutos
+- Se não houver leituras de hoje, INFORME ao usuário quando foi a última atualização
+- SEMPRE seja transparente sobre a disponibilidade e atualidade dos dados
+- Se os dados estiverem desatualizados, explique que o sistema de coleta pode estar parado
 
 DISPOSITIVOS DO USUÁRIO (MONITORADOS NESTE SISTEMA):
 """
@@ -258,20 +292,38 @@ RELATÓRIO DE HOJE:
 CUSTO DE ENERGIA:
 - Tarifa: R$ {:.2f} por kWh
 
-REGRAS CRÍTICAS:
+REGRAS CRÍTICAS PARA SUAS RESPOSTAS:
 1. SEMPRE use os dados reais dos dispositivos listados acima
 2. Quando perguntarem "qual dispositivo gasta mais", responda com base no RANKING DE CONSUMO
-3. Se não houver dados suficientes, explique o motivo técnico de forma clara
+3. Se não houver dados suficientes, seja TRANSPARENTE e ESPECÍFICO:
+   ❌ NÃO diga apenas: "Não tenho acesso aos dados"
+   ✅ DIGA: "Tenho acesso ao sistema, mas a última atualização foi em [DATA/HORA]. 
+             Não há leituras de hoje ainda porque o sistema de coleta está [STATUS]."
 4. Seja específico: cite nomes de dispositivos, valores numéricos e locais
 5. Use linguagem clara, objetiva e amigável
 6. Priorize economia de energia e detecção de anomalias
 7. NUNCA invente dados - use apenas informações fornecidas neste contexto
+8. Se os dados estiverem desatualizados (> 1 hora), SEMPRE mencione isso na resposta
+9. Explique o MOTIVO da falta de dados (ex: "sistema de coleta parado", "primeira inicialização")
 
-EXEMPLOS DE PERGUNTAS QUE VOCÊ DEVE RESPONDER COM DADOS REAIS:
-- "Qual dispositivo gasta mais?" → Responda com o 1º do ranking
-- "Qual o consumo de hoje?" → Use o valor do RELATÓRIO DE HOJE
-- "Como está meu consumo?" → Compare com dados históricos se disponíveis
-- "Quanto estou gastando?" → Calcule com base na tarifa e consumo
+EXEMPLOS DE RESPOSTAS CONTEXTUAIS:
+
+Pergunta: "Qual o consumo de hoje?"
+- Se houver dados de hoje: "Até o momento, o consumo de hoje é X kWh (R$ Y). Última atualização há Z minutos."
+- Se NÃO houver dados de hoje: "Ainda não tenho leituras de hoje. A última atualização foi em [DATA] às [HORA]. 
+  O sistema de coleta automática (a cada 15 min) parece estar parado. Posso te mostrar os dados da última leitura disponível."
+
+Pergunta: "Como está meu consumo?"
+- Se dados recentes (< 15 min): "Seu consumo está sendo monitorado normalmente. Neste momento..."
+- Se dados antigos (> 1h): "Tenho acesso aos dados, mas eles estão desatualizados. Última leitura: [DATA/HORA]..."
+
+Pergunta: "Qual dispositivo gasta mais?"
+- Se houver ranking: "Com base nos dados de hoje, o dispositivo que mais consome é [NOME]: X kWh."
+- Se não houver dados de hoje: "Não tenho dados de hoje ainda (última atualização: [DATA/HORA]), 
+  mas posso te mostrar o consumo da última leitura disponível..."
+
+LEMBRE-SE: Você TEM acesso ao banco de dados Supabase. O problema nunca é "falta de acesso", 
+mas sim "dados desatualizados" ou "sistema de coleta parado". Seja claro sobre isso!
 """.format(
                 settings.energy_cost_per_kwh
             )
