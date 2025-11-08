@@ -1014,42 +1014,160 @@ def render_smartlife_dashboard(smartlife_data: dict):
 
 
 def render_chat_assistant():
-    """Renderizar assistente de IA"""
-    st.markdown("### 🤖 Assistente de Energia")
+    """Renderizar assistente de IA com interface moderna"""
+    # CSS customizado para chat moderno
+    st.markdown(
+        """
+        <style>
+        .chat-container {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            padding: 2rem;
+            border-radius: 15px;
+            margin-bottom: 2rem;
+        }
+        .chat-title {
+            color: white;
+            font-size: 2rem;
+            font-weight: bold;
+            text-align: center;
+            margin-bottom: 0.5rem;
+        }
+        .chat-subtitle {
+            color: rgba(255,255,255,0.9);
+            text-align: center;
+            font-size: 1rem;
+        }
+        .stChatMessage {
+            background: rgba(255,255,255,0.05);
+            border-radius: 12px;
+            padding: 1rem;
+            margin: 0.5rem 0;
+            backdrop-filter: blur(10px);
+        }
+        .stChatMessage[data-testid="user-message"] {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        }
+        .stChatMessage[data-testid="assistant-message"] {
+            background: rgba(30,30,30,0.8);
+            border-left: 3px solid #667eea;
+        }
+        </style>
+        """,
+        unsafe_allow_html=True,
+    )
 
+    # Header do chat
+    st.markdown(
+        """
+        <div class="chat-container">
+            <div class="chat-title">🤖 Assistente Inteligente de Energia</div>
+            <div class="chat-subtitle">Pergunte sobre consumo, custos e receba insights personalizados</div>
+        </div>
+        """,
+        unsafe_allow_html=True,
+    )
+
+    # Inicializar histórico
     if "chat_history" not in st.session_state:
         st.session_state.chat_history = []
 
-    provider = st.selectbox("Modelo", ["auto", "openai", "gemini"], index=0)
-    question = st.text_input(
-        "Pergunte sobre seu consumo ou custos", "Como foi meu consumo hoje?"
-    )
+    # Configurações em expander
+    with st.expander("⚙️ Configurações do Assistente", expanded=False):
+        col1, col2 = st.columns(2)
+        with col1:
+            provider = st.selectbox(
+                "Modelo de IA",
+                ["auto", "openai", "gemini"],
+                index=0,
+                help="Auto: tenta OpenAI primeiro, depois Gemini",
+            )
+        with col2:
+            if st.button("🗑️ Limpar Conversa"):
+                st.session_state.chat_history = []
+                st.rerun()
 
-    if st.button("Enviar pergunta", type="primary"):
-        if question.strip():
-            st.session_state.chat_history.append({"role": "user", "content": question})
-            try:
-                response = requests.post(
-                    f"{API_BASE_URL}/ai/ask",
-                    json={"question": question, "provider": provider},
-                    timeout=60,
-                )
-                if response.status_code == 200:
-                    data = response.json()
-                    st.session_state.chat_history.append(
-                        {
-                            "role": "assistant",
-                            "content": data.get("response", "Sem resposta."),
-                        }
+    # Container de mensagens
+    chat_container = st.container()
+
+    with chat_container:
+        # Exibir histórico de mensagens
+        for idx, message in enumerate(st.session_state.chat_history):
+            with st.chat_message(
+                message["role"], avatar="👤" if message["role"] == "user" else "🤖"
+            ):
+                st.markdown(message["content"])
+
+    # Input de mensagem (sempre no final)
+    if prompt := st.chat_input(
+        "Digite sua pergunta sobre consumo de energia...", key="chat_input"
+    ):
+        # Adicionar mensagem do usuário
+        st.session_state.chat_history.append({"role": "user", "content": prompt})
+
+        # Exibir mensagem do usuário imediatamente
+        with st.chat_message("user", avatar="👤"):
+            st.markdown(prompt)
+
+        # Exibir indicador de digitação
+        with st.chat_message("assistant", avatar="🤖"):
+            with st.spinner("Pensando..."):
+                try:
+                    response = requests.post(
+                        f"{API_BASE_URL}/ai/ask",
+                        json={"question": prompt, "provider": provider},
+                        timeout=60,
                     )
-                else:
-                    st.error("Falha ao consultar o assistente.")
-            except requests.exceptions.RequestException as exc:
-                st.error(f"Erro ao conectar ao assistente: {exc}")
 
-    for message in st.session_state.chat_history[-10:]:
-        with st.chat_message(message["role"]):
-            st.write(message["content"])
+                    if response.status_code == 200:
+                        data = response.json()
+                        assistant_response = data.get("response", "Sem resposta.")
+                        provider_used = data.get("provider", "desconhecido")
+
+                        # Adicionar resposta ao histórico
+                        st.session_state.chat_history.append(
+                            {"role": "assistant", "content": assistant_response}
+                        )
+
+                        # Exibir resposta
+                        st.markdown(assistant_response)
+
+                        # Exibir metadados discretamente
+                        st.caption(f"✨ Respondido por: {provider_used}")
+
+                    else:
+                        error_msg = (
+                            "❌ Falha ao consultar o assistente. Tente novamente."
+                        )
+                        st.error(error_msg)
+                        st.session_state.chat_history.append(
+                            {"role": "assistant", "content": error_msg}
+                        )
+
+                except requests.exceptions.RequestException as exc:
+                    error_msg = f"❌ Erro de conexão: {str(exc)}"
+                    st.error(error_msg)
+                    st.session_state.chat_history.append(
+                        {"role": "assistant", "content": error_msg}
+                    )
+
+    # Sugestões de perguntas (se histórico vazio)
+    if not st.session_state.chat_history:
+        st.markdown("### 💡 Perguntas Sugeridas")
+        col1, col2, col3 = st.columns(3)
+
+        suggestions = [
+            "📊 Como está meu consumo hoje?",
+            "💰 Qual dispositivo gasta mais?",
+            "⚡ Dê dicas de economia",
+        ]
+
+        for col, suggestion in zip([col1, col2, col3], suggestions):
+            with col:
+                if st.button(suggestion, use_container_width=True):
+                    st.session_state.chat_history.append(
+                        {"role": "user", "content": suggestion}
+                    )
+                    st.rerun()
 
 
 # Fluxo principal com tabs

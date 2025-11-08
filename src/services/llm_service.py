@@ -5,7 +5,7 @@ Serviço de LLM para assistente inteligente da Casa Inteligente
 import logging
 from typing import Dict, List, Optional, Any
 from datetime import datetime, timedelta
-import openai
+from openai import AsyncOpenAI
 import google.generativeai as genai
 
 from src.utils.config import settings
@@ -22,14 +22,11 @@ class LLMService:
         self.openai_client = None
         self.gemini_client = None
 
-        # Inicializar OpenAI
+        # Inicializar OpenAI com nova API v1.0+
         if settings.openai_api_key:
             try:
-                openai.api_key = settings.openai_api_key
-                self.openai_client = openai
-                # Compatibilidade com códigos antigos que referenciam self.openai
-                self.openai = self.openai_client
-                logger.info("Cliente OpenAI inicializado")
+                self.openai_client = AsyncOpenAI(api_key=settings.openai_api_key)
+                logger.info("Cliente OpenAI inicializado (API v1.0+)")
             except Exception as e:
                 logger.error(f"Erro ao inicializar OpenAI: {str(e)}")
 
@@ -150,20 +147,20 @@ EXEMPLOS DE PERGUNTAS QUE VOCÊ PODE RESPONDER:
             return "Erro ao obter dados do sistema. Tente novamente em instantes."
 
     async def ask_openai(self, question: str) -> Optional[str]:
-        """Fazer pergunta ao OpenAI GPT"""
+        """Fazer pergunta ao OpenAI GPT usando nova API v1.0+"""
         if not self.openai_client:
             return "OpenAI não configurado"
 
         try:
             context = self.get_system_context()
 
-            response = await self.openai_client.ChatCompletion.acreate(
-                model="gpt-5-nano",
+            response = await self.openai_client.chat.completions.create(
+                model="gpt-4o-mini",  # Modelo moderno e eficiente
                 messages=[
                     {"role": "system", "content": context},
                     {"role": "user", "content": question},
                 ],
-                max_tokens=500,
+                max_tokens=800,
                 temperature=0.7,
             )
 
