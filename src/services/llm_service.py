@@ -69,20 +69,31 @@ class LLMService:
             # Obter status atual
             status = energy_service.get_realtime_status()
 
-            # Obter dispositivos
+            # Obter dispositivos (incluir is_active=None para TAPO)
             db = next(get_db())
-            devices = db.query(Device).filter(Device.is_active == True).all()
+            devices = (
+                db.query(Device)
+                .filter((Device.is_active == True) | (Device.is_active == None))
+                .all()
+            )
 
             context = f"""
-Você é o assistente inteligente da Casa Inteligente, um sistema de monitoramento de consumo de energia residencial.
+Você é o assistente inteligente da Casa Inteligente, um sistema de monitoramento de consumo de energia residencial do usuário.
+
+IMPORTANTE: Quando o usuário perguntar sobre "dispositivos", "consumo" ou "gastos" SEM especificar contexto externo, 
+SEMPRE se refira aos dispositivos DESTE SISTEMA listados abaixo. Estes são OS DISPOSITIVOS DO USUÁRIO.
 
 CONTEXTO ATUAL DO SISTEMA:
 - Data/Hora: {datetime.utcnow().strftime('%d/%m/%Y %H:%M:%S')}
 - Consumo Total Atual: {status.get('total_current_power_watts', 0):.2f} W
-- Dispositivos Ativos: {status.get('active_devices', 0)} de {len(devices)}
+- Dispositivos Monitorados: {len(devices)}
+- Dispositivos Ativos Agora: {status.get('active_devices', 0)}
 
-DISPOSITIVOS MONITORADOS:
+DISPOSITIVOS DO USUÁRIO (MONITORADOS NESTE SISTEMA):
 """
+
+            # Coletar dados de consumo para ranking
+            device_consumption = []
 
             for device in devices:
                 device_status = next(
@@ -94,15 +105,39 @@ DISPOSITIVOS MONITORADOS:
                     {},
                 )
                 current_power = device_status.get("current_power_watts", 0)
+                energy_today = device_status.get("energy_today_kwh", 0)
+
+                device_consumption.append(
+                    {
+                        "name": device.name,
+                        "equipment": device.equipment_connected,
+                        "location": device.location,
+                        "type": device.type,
+                        "current_power": current_power,
+                        "energy_today": energy_today,
+                    }
+                )
 
                 context += f"""
 - {device.name}:
-  • Local: {device.location}
   • Equipamento: {device.equipment_connected}
+  • Local: {device.location}
   • Tipo: {device.type}
   • Consumo Atual: {current_power:.2f} W
-  • Status: {'Ativo' if current_power > 0 else 'Inativo'}
+  • Energia Hoje: {energy_today:.3f} kWh
+  • Status: {'🟢 Ligado' if current_power > 0 else '🔴 Desligado'}
 """
+
+            # Ranking de consumo
+            device_consumption.sort(key=lambda x: x["energy_today"], reverse=True)
+            if device_consumption and device_consumption[0]["energy_today"] > 0:
+                context += f"""
+
+RANKING DE CONSUMO HOJE (maior para menor):
+"""
+                for idx, dev in enumerate(device_consumption[:5], 1):
+                    if dev["energy_today"] > 0:
+                        context += f"{idx}. {dev['equipment']} ({dev['name']}): {dev['energy_today']:.3f} kWh\n"
 
             # Obter relatório de hoje
             today_report = energy_service.generate_daily_report()
@@ -118,23 +153,22 @@ RELATÓRIO DE HOJE:
             context += """
 
 CUSTO DE ENERGIA:
-- Valor por kWh: R$ {:.2f}
+- Tarifa: R$ {:.2f} por kWh
 
-REGRAS IMPORTANTES:
-1. Sempre baseie suas respostas nos dados reais do sistema
-2. Se não tiver dados suficientes, informe o usuário
-3. Forneça recomendações práticas para economia de energia
-4. Alerte sobre consumos anômalos quando detectados
-5. Use linguagem clara e objetiva
-6. Seja proativo em identificar problemas potenciais
+REGRAS CRÍTICAS:
+1. SEMPRE use os dados reais dos dispositivos listados acima
+2. Quando perguntarem "qual dispositivo gasta mais", responda com base no RANKING DE CONSUMO
+3. Se não houver dados suficientes, explique o motivo técnico de forma clara
+4. Seja específico: cite nomes de dispositivos, valores numéricos e locais
+5. Use linguagem clara, objetiva e amigável
+6. Priorize economia de energia e detecção de anomalias
+7. NUNCA invente dados - use apenas informações fornecidas neste contexto
 
-EXEMPLOS DE PERGUNTAS QUE VOCÊ PODE RESPONDER:
-- "Qual equipamento está consumindo mais energia agora?"
-- "Meu consumo hoje está normal?"
-- "Como posso reduzir o consumo de energia?"
-- "Existe algum dispositivo com comportamento estranho?"
-- "Qual foi o custo total ontem?"
-- "Recomende ações para economizar energia"
+EXEMPLOS DE PERGUNTAS QUE VOCÊ DEVE RESPONDER COM DADOS REAIS:
+- "Qual dispositivo gasta mais?" → Responda com o 1º do ranking
+- "Qual o consumo de hoje?" → Use o valor do RELATÓRIO DE HOJE
+- "Como está meu consumo?" → Compare com dados históricos se disponíveis
+- "Quanto estou gastando?" → Calcule com base na tarifa e consumo
 """.format(
                 settings.energy_cost_per_kwh
             )

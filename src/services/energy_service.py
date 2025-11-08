@@ -454,8 +454,12 @@ class EnergyAnalysisService:
         try:
             db = next(get_db())
 
-            # Obter última leitura de cada dispositivo
-            devices = db.query(Device).filter(Device.is_active == True).all()
+            # Obter última leitura de cada dispositivo (incluir is_active=None para TAPO)
+            devices = (
+                db.query(Device)
+                .filter((Device.is_active == True) | (Device.is_active == None))
+                .all()
+            )
 
             status = {
                 "timestamp": datetime.utcnow(),
@@ -473,6 +477,21 @@ class EnergyAnalysisService:
                     .first()
                 )
 
+                # Calcular energia de hoje
+                today_start = datetime.utcnow().replace(
+                    hour=0, minute=0, second=0, microsecond=0
+                )
+                energy_today = (
+                    db.query(EnergyReading)
+                    .filter(
+                        EnergyReading.device_id == device.id,
+                        EnergyReading.timestamp >= today_start,
+                    )
+                    .with_entities(db.func.sum(EnergyReading.energy_kwh).label("total"))
+                    .scalar()
+                    or 0
+                )
+
                 if latest_reading:
                     device_status = {
                         "device_id": device.id,
@@ -480,6 +499,7 @@ class EnergyAnalysisService:
                         "location": device.location,
                         "equipment": device.equipment_connected,
                         "current_power_watts": latest_reading.power_watts,
+                        "energy_today_kwh": float(energy_today),
                         "last_reading": latest_reading.timestamp,
                         "is_active": latest_reading.power_watts > 0,
                     }
