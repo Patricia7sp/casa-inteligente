@@ -1086,69 +1086,65 @@ def render_chat_assistant():
                 st.session_state.chat_history = []
                 st.rerun()
 
-    # Container de mensagens
-    chat_container = st.container()
+    # Exibir histórico de mensagens
+    for idx, message in enumerate(st.session_state.chat_history):
+        with st.chat_message(
+            message["role"], avatar="👤" if message["role"] == "user" else "🤖"
+        ):
+            st.markdown(message["content"])
 
-    with chat_container:
-        # Exibir histórico de mensagens
-        for idx, message in enumerate(st.session_state.chat_history):
-            with st.chat_message(
-                message["role"], avatar="👤" if message["role"] == "user" else "🤖"
-            ):
-                st.markdown(message["content"])
+    # Input de mensagem com form (compatível com tabs)
+    with st.form(key="chat_form", clear_on_submit=True):
+        col1, col2 = st.columns([6, 1])
+        with col1:
+            prompt = st.text_input(
+                "Digite sua pergunta:",
+                placeholder="Como está meu consumo hoje?",
+                label_visibility="collapsed",
+            )
+        with col2:
+            submit = st.form_submit_button("📤 Enviar", use_container_width=True)
 
-    # Input de mensagem (sempre no final)
-    if prompt := st.chat_input(
-        "Digite sua pergunta sobre consumo de energia...", key="chat_input"
-    ):
+    if submit and prompt.strip():
         # Adicionar mensagem do usuário
         st.session_state.chat_history.append({"role": "user", "content": prompt})
 
-        # Exibir mensagem do usuário imediatamente
-        with st.chat_message("user", avatar="👤"):
-            st.markdown(prompt)
+        # Fazer requisição ao assistente
+        try:
+            with st.spinner("🤖 Pensando..."):
+                response = requests.post(
+                    f"{API_BASE_URL}/ai/ask",
+                    json={"question": prompt, "provider": provider},
+                    timeout=60,
+                )
 
-        # Exibir indicador de digitação
-        with st.chat_message("assistant", avatar="🤖"):
-            with st.spinner("Pensando..."):
-                try:
-                    response = requests.post(
-                        f"{API_BASE_URL}/ai/ask",
-                        json={"question": prompt, "provider": provider},
-                        timeout=60,
+                if response.status_code == 200:
+                    data = response.json()
+                    assistant_response = data.get("response", "Sem resposta.")
+                    provider_used = data.get("provider", "desconhecido")
+
+                    # Adicionar resposta ao histórico
+                    st.session_state.chat_history.append(
+                        {
+                            "role": "assistant",
+                            "content": f"{assistant_response}\n\n*✨ Respondido por: {provider_used}*",
+                        }
                     )
 
-                    if response.status_code == 200:
-                        data = response.json()
-                        assistant_response = data.get("response", "Sem resposta.")
-                        provider_used = data.get("provider", "desconhecido")
-
-                        # Adicionar resposta ao histórico
-                        st.session_state.chat_history.append(
-                            {"role": "assistant", "content": assistant_response}
-                        )
-
-                        # Exibir resposta
-                        st.markdown(assistant_response)
-
-                        # Exibir metadados discretamente
-                        st.caption(f"✨ Respondido por: {provider_used}")
-
-                    else:
-                        error_msg = (
-                            "❌ Falha ao consultar o assistente. Tente novamente."
-                        )
-                        st.error(error_msg)
-                        st.session_state.chat_history.append(
-                            {"role": "assistant", "content": error_msg}
-                        )
-
-                except requests.exceptions.RequestException as exc:
-                    error_msg = f"❌ Erro de conexão: {str(exc)}"
-                    st.error(error_msg)
+                else:
+                    error_msg = "❌ Falha ao consultar o assistente. Tente novamente."
                     st.session_state.chat_history.append(
                         {"role": "assistant", "content": error_msg}
                     )
+
+        except requests.exceptions.RequestException as exc:
+            error_msg = f"❌ Erro de conexão: {str(exc)}"
+            st.session_state.chat_history.append(
+                {"role": "assistant", "content": error_msg}
+            )
+
+        # Recarregar para exibir nova mensagem
+        st.rerun()
 
     # Sugestões de perguntas (se histórico vazio)
     if not st.session_state.chat_history:
