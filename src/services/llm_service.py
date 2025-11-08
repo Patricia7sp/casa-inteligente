@@ -7,10 +7,9 @@ from typing import Dict, List, Optional, Any
 from datetime import datetime, timedelta
 from openai import AsyncOpenAI
 import google.generativeai as genai
+import requests
 
 from src.utils.config import settings
-from src.services.energy_service import energy_service
-from src.models.database import Device, DailyReport, get_db
 
 logger = logging.getLogger(__name__)
 
@@ -21,6 +20,18 @@ class LLMService:
     def __init__(self):
         self.openai_client = None
         self.gemini_client = None
+
+        # Configuração do Supabase
+        self.supabase_url = getattr(
+            settings,
+            "supabase_url",
+            "https://pqqrodiuuhckvdqawgeg.supabase.co",
+        )
+        self.supabase_key = getattr(
+            settings,
+            "supabase_anon_key",
+            "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InBxcXJvZGl1dWhja3ZkcWF3Z2VnIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjI0OTI0MTIsImV4cCI6MjA3ODA2ODQxMn0.ve7NIbFcZdTGa16O3Pttmpx2mxWgklvbPwwTSCHuDFs",
+        )
 
         # Inicializar OpenAI com nova API v1.0+
         if settings.openai_api_key:
@@ -63,18 +74,45 @@ class LLMService:
         else:
             self.gemini_model_name = None
 
-    def get_system_context(self) -> str:
-        """Obter contexto do sistema para o LLM"""
+    def _get_supabase_data(self, endpoint: str, params: dict = None) -> list:
+        """Buscar dados do Supabase via REST API"""
         try:
-            # Obter status atual
-            status = energy_service.get_realtime_status()
+            url = f"{self.supabase_url}/rest/v1/{endpoint}"
+            headers = {
+                "apikey": self.supabase_key,
+                "Authorization": f"Bearer {self.supabase_key}",
+                "Content-Type": "application/json",
+            }
+            response = requests.get(url, headers=headers, params=params, timeout=10)
+            if response.status_code == 200:
+                return response.json()
+            else:
+                logger.error(
+                    f"Erro ao buscar {endpoint} do Supabase: {response.status_code}"
+                )
+                return []
+        except Exception as e:
+            logger.error(f"Erro ao conectar ao Supabase: {str(e)}")
+            return []
 
-            # Obter dispositivos (incluir is_active=None para TAPO)
-            db = next(get_db())
-            devices = (
-                db.query(Device)
-                .filter((Device.is_active == True) | (Device.is_active == None))
-                .all()
+    def get_system_context(self) -> str:
+        """Obter contexto do sistema para o LLM usando dados do Supabase"""
+        try:
+            # Buscar dispositivos do Supabase
+            devices = self._get_supabase_data("devices")
+            if not devices:
+                return "Não foi possível acessar os dados dos dispositivos. Tente novamente."
+
+            # Buscar leituras de energia de hoje
+            today_start = datetime.utcnow().replace(
+                hour=0, minute=0, second=0, microsecond=0
+            )
+            readings = self._get_supabase_data(
+                "energy_readings",
+                params={
+                    "timestamp": f"gte.{today_start.isoformat()}",
+                    "order": "timestamp.desc",
+                },
             )
 
             context = f"""
@@ -85,53 +123,76 @@ SEMPRE se refira aos dispositivos DESTE SISTEMA listados abaixo. Estes são OS D
 
 CONTEXTO ATUAL DO SISTEMA:
 - Data/Hora: {datetime.utcnow().strftime('%d/%m/%Y %H:%M:%S')}
-- Consumo Total Atual: {status.get('total_current_power_watts', 0):.2f} W
 - Dispositivos Monitorados: {len(devices)}
-- Dispositivos Ativos Agora: {status.get('active_devices', 0)}
 
 DISPOSITIVOS DO USUÁRIO (MONITORADOS NESTE SISTEMA):
 """
 
-            # Coletar dados de consumo para ranking
+            # Processar dados de cada dispositivo
             device_consumption = []
+            total_power = 0
+            active_count = 0
 
             for device in devices:
-                device_status = next(
-                    (
-                        d
-                        for d in status.get("devices", [])
-                        if d["device_id"] == device.id
-                    ),
-                    {},
-                )
-                current_power = device_status.get("current_power_watts", 0)
-                energy_today = device_status.get("energy_today_kwh", 0)
+                device_id = device.get("id")
+                device_name = device.get("name", "Dispositivo")
+                equipment = device.get("equipment_connected", "N/A")
+                location = device.get("location", "N/A")
+                device_type = device.get("type", "N/A")
+
+                # Buscar última leitura deste dispositivo
+                device_readings = [
+                    r for r in readings if r.get("device_id") == device_id
+                ]
+                current_power = 0
+                energy_today = 0
+
+                if device_readings:
+                    # Última leitura
+                    latest = device_readings[0]
+                    current_power = latest.get("power_watts", 0)
+
+                    # Somar energia de hoje
+                    energy_today = sum(r.get("energy_kwh", 0) for r in device_readings)
+
+                    total_power += current_power
+                    if current_power > 0:
+                        active_count += 1
 
                 device_consumption.append(
                     {
-                        "name": device.name,
-                        "equipment": device.equipment_connected,
-                        "location": device.location,
-                        "type": device.type,
+                        "name": device_name,
+                        "equipment": equipment,
+                        "location": location,
+                        "type": device_type,
                         "current_power": current_power,
                         "energy_today": energy_today,
                     }
                 )
 
+                status_icon = "🟢 Ligado" if current_power > 0 else "🔴 Desligado"
                 context += f"""
-- {device.name}:
-  • Equipamento: {device.equipment_connected}
-  • Local: {device.location}
-  • Tipo: {device.type}
+- {device_name}:
+  • Equipamento: {equipment}
+  • Local: {location}
+  • Tipo: {device_type}
   • Consumo Atual: {current_power:.2f} W
   • Energia Hoje: {energy_today:.3f} kWh
-  • Status: {'🟢 Ligado' if current_power > 0 else '🔴 Desligado'}
+  • Status: {status_icon}
+"""
+
+            # Adicionar totais
+            context += f"""
+
+TOTAIS DO SISTEMA:
+- Consumo Total Atual: {total_power:.2f} W
+- Dispositivos Ativos Agora: {active_count} de {len(devices)}
 """
 
             # Ranking de consumo
             device_consumption.sort(key=lambda x: x["energy_today"], reverse=True)
             if device_consumption and device_consumption[0]["energy_today"] > 0:
-                context += f"""
+                context += """
 
 RANKING DE CONSUMO HOJE (maior para menor):
 """
@@ -139,15 +200,14 @@ RANKING DE CONSUMO HOJE (maior para menor):
                     if dev["energy_today"] > 0:
                         context += f"{idx}. {dev['equipment']} ({dev['name']}): {dev['energy_today']:.3f} kWh\n"
 
-            # Obter relatório de hoje
-            today_report = energy_service.generate_daily_report()
-            if today_report and "error" not in today_report:
+                # Calcular custo total
+                total_energy = sum(d["energy_today"] for d in device_consumption)
+                total_cost = total_energy * settings.energy_cost_per_kwh
                 context += f"""
 
 RELATÓRIO DE HOJE:
-- Consumo Total: {today_report.get('total_energy_kwh', 0):.3f} kWh
-- Custo Estimado: R$ {today_report.get('total_cost', 0):.2f}
-- Dispositivos com Anomalias: {len(today_report.get('anomalies', []))}
+- Consumo Total: {total_energy:.3f} kWh
+- Custo Estimado: R$ {total_cost:.2f}
 """
 
             context += """
@@ -173,7 +233,6 @@ EXEMPLOS DE PERGUNTAS QUE VOCÊ DEVE RESPONDER COM DADOS REAIS:
                 settings.energy_cost_per_kwh
             )
 
-            db.close()
             return context
 
         except Exception as e:
@@ -283,6 +342,7 @@ EXEMPLOS DE PERGUNTAS QUE VOCÊ DEVE RESPONDER COM DADOS REAIS:
     def get_energy_insights(self, days: int = 7) -> Dict[str, Any]:
         """
         Gerar insights automáticos sobre consumo de energia
+        NOTA: Temporariamente desabilitado - será reimplementado com Supabase
 
         Args:
             days: Número de dias para análise
@@ -291,8 +351,8 @@ EXEMPLOS DE PERGUNTAS QUE VOCÊ DEVE RESPONDER COM DADOS REAIS:
             Dict com insights e recomendações
         """
         try:
-            db = next(get_db())
-            devices = db.query(Device).filter(Device.is_active == True).all()
+            # TODO: Reimplementar usando Supabase
+            devices = self._get_supabase_data("devices")
 
             insights = {
                 "period_days": days,
@@ -303,47 +363,13 @@ EXEMPLOS DE PERGUNTAS QUE VOCÊ DEVE RESPONDER COM DADOS REAIS:
                 "summary": "",
             }
 
-            # Analisar cada dispositivo
-            for device in devices:
-                trends = energy_service.get_consumption_trends(device.id, days)
+            # Retornar insights básicos por enquanto
+            insights["recommendations"] = [
+                "Monitore regularmente o consumo através do dashboard",
+                "Verifique dispositivos que ficam ligados desnecessariamente",
+            ]
+            insights["summary"] = f"Sistema monitorando {len(devices)} dispositivos."
 
-                if trends:
-                    # Top consumidores
-                    if trends["total_energy_kwh"] > 0:
-                        insights["top_consumers"].append(
-                            {
-                                "device_name": device.name,
-                                "location": device.location,
-                                "total_energy_kwh": trends["total_energy_kwh"],
-                                "average_daily_cost": trends["average_daily_cost"],
-                            }
-                        )
-
-                    # Detectar anomalias
-                    if (
-                        trends["max_daily_energy_kwh"]
-                        > trends["average_daily_energy_kwh"] * 2
-                    ):
-                        insights["anomalies_detected"].append(
-                            {
-                                "device_name": device.name,
-                                "issue": f"Pico de consumo detectado: {trends['max_daily_energy_kwh']:.3f} kWh",
-                                "recommendation": "Verifique se o equipamento está funcionando corretamente",
-                            }
-                        )
-
-            # Ordenar top consumidores
-            insights["top_consumers"].sort(
-                key=lambda x: x["total_energy_kwh"], reverse=True
-            )
-
-            # Gerar recomendações
-            insights["recommendations"] = self._generate_recommendations(insights)
-
-            # Gerar resumo
-            insights["summary"] = self._generate_summary(insights)
-
-            db.close()
             return insights
 
         except Exception as e:
