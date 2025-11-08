@@ -8,18 +8,12 @@ from datetime import datetime, timedelta
 from contextlib import asynccontextmanager
 from typing import List, Dict
 
-from fastapi import FastAPI, HTTPException, Depends, BackgroundTasks
+from fastapi import FastAPI, HTTPException, BackgroundTasks
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 import uvicorn
+import requests
 
-from src.models.database import (
-    Device,
-    EnergyReading,
-    DailyReport,
-    get_db,
-    create_tables,
-)
 from src.integrations.tapo_client import TapoClient
 from src.integrations.nova_digital_client import NovaDigitalClient, DeviceClientFactory
 from src.agents.collector import EnergyCollector
@@ -37,6 +31,56 @@ from src.utils.logger import setup_logging
 # Configurar logging
 setup_logging()
 logger = logging.getLogger(__name__)
+
+# Configuração do Supabase
+SUPABASE_URL = getattr(
+    settings,
+    "supabase_url",
+    "https://pqqrodiuuhckvdqawgeg.supabase.co",
+)
+SUPABASE_KEY = getattr(
+    settings,
+    "supabase_anon_key",
+    "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InBxcXJvZGl1dWhja3ZkcWF3Z2VnIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjI0OTI0MTIsImV4cCI6MjA3ODA2ODQxMn0.ve7NIbFcZdTGa16O3Pttmpx2mxWgklvbPwwTSCHuDFs",
+)
+
+
+def get_supabase_data(endpoint: str, params: dict = None) -> list:
+    """Buscar dados do Supabase via REST API"""
+    try:
+        url = f"{SUPABASE_URL}/rest/v1/{endpoint}"
+        headers = {
+            "apikey": SUPABASE_KEY,
+            "Authorization": f"Bearer {SUPABASE_KEY}",
+            "Content-Type": "application/json",
+        }
+        response = requests.get(url, headers=headers, params=params, timeout=10)
+        if response.status_code == 200:
+            return response.json()
+        else:
+            logger.error(f"Erro ao buscar {endpoint}: {response.status_code}")
+            return []
+    except Exception as e:
+        logger.error(f"Erro ao conectar ao Supabase: {str(e)}")
+        return []
+
+
+def save_to_supabase(endpoint: str, data: dict) -> bool:
+    """Salvar dados no Supabase via REST API"""
+    try:
+        url = f"{SUPABASE_URL}/rest/v1/{endpoint}"
+        headers = {
+            "apikey": SUPABASE_KEY,
+            "Authorization": f"Bearer {SUPABASE_KEY}",
+            "Content-Type": "application/json",
+            "Prefer": "return=minimal",
+        }
+        response = requests.post(url, headers=headers, json=data, timeout=10)
+        return response.status_code in [200, 201]
+    except Exception as e:
+        logger.error(f"Erro ao salvar no Supabase: {str(e)}")
+        return False
+
 
 # Inicializar coletor
 collector = EnergyCollector()
@@ -133,145 +177,33 @@ async def health_check():
 
 @app.get("/devices")
 async def get_devices():
-    """Obter todos os dispositivos cadastrados"""
+    """Obter todos os dispositivos cadastrados do Supabase"""
     try:
-        db = next(get_db())
-        devices = db.query(Device).filter(Device.is_active == True).all()
+        devices = get_supabase_data("devices")
 
-        device_list = []
-        for device in devices:
-            device_list.append(
-                {
-                    "id": device.id,
-                    "name": device.name,
-                    "type": device.type,
-                    "ip_address": device.ip_address,
-                    "location": device.location,
-                    "equipment_connected": device.equipment_connected,
-                    "created_at": device.created_at,
-                }
-            )
+        # Filtrar apenas dispositivos ativos
+        active_devices = [d for d in devices if d.get("is_active") is not False]
 
-        db.close()
-        return {"devices": device_list, "count": len(device_list)}
+        return {"devices": active_devices, "count": len(active_devices)}
 
     except Exception as e:
         logger.error(f"Erro ao obter dispositivos: {str(e)}")
         raise HTTPException(status_code=500, detail="Erro ao obter dispositivos")
 
 
-@app.post("/devices")
-async def add_device(device_data: Dict, background_tasks: BackgroundTasks):
-    """Adicionar novo dispositivo"""
-    try:
-        db = next(get_db())
-
-        # Verificar se dispositivo já existe
-        existing = (
-            db.query(Device)
-            .filter(Device.ip_address == device_data["ip_address"])
-            .first()
-        )
-        if existing:
-            db.close()
-            raise HTTPException(
-                status_code=400, detail="Dispositivo com este IP já existe"
-            )
-
-        # Criar novo dispositivo
-        device = Device(
-            name=device_data["name"],
-            type=device_data["type"],
-            ip_address=device_data["ip_address"],
-            mac_address=device_data.get("mac_address"),
-            model=device_data.get("model"),
-            location=device_data.get("location"),
-            equipment_connected=device_data.get("equipment_connected"),
-        )
-
-        db.add(device)
-        db.commit()
-        db.refresh(device)
-
-        # Adicionar ao coletor em background
-        if device.type.upper() == "TAPO":
-            background_tasks.add_task(
-                collector.tapo_client.add_device, device.ip_address, device.name
-            )
-
-        db.close()
-
-        logger.info(f"Dispositivo {device.name} adicionado com sucesso")
-        return {"message": "Dispositivo adicionado com sucesso", "device_id": device.id}
-
-    except HTTPException:
-        raise
-    except Exception as e:
-        logger.error(f"Erro ao adicionar dispositivo: {str(e)}")
-        raise HTTPException(status_code=500, detail="Erro ao adicionar dispositivo")
+# NOTA: Endpoint temporariamente desabilitado - migração para Supabase
+# @app.post("/devices")
+# async def add_device(device_data: Dict, background_tasks: BackgroundTasks):
+#     """Adicionar novo dispositivo"""
+#     # TODO: Reimplementar usando Supabase REST API
+#     raise HTTPException(status_code=501, detail="Endpoint em manutenção - use o Supabase diretamente")
 
 
-@app.get("/devices/{device_id}/status")
-async def get_device_status(device_id: int):
-    """Obter status atual de um dispositivo"""
-    try:
-        db = next(get_db())
-        device = db.query(Device).filter(Device.id == device_id).first()
-
-        if not device:
-            db.close()
-            raise HTTPException(status_code=404, detail="Dispositivo não encontrado")
-
-        # Obter última leitura
-        latest_reading = (
-            db.query(EnergyReading)
-            .filter(EnergyReading.device_id == device_id)
-            .order_by(EnergyReading.timestamp.desc())
-            .first()
-        )
-
-        status = {
-            "device_id": device.id,
-            "device_name": device.name,
-            "type": device.type,
-            "ip_address": device.ip_address,
-            "location": device.location,
-            "equipment_connected": device.equipment_connected,
-            "is_active": device.is_active,
-        }
-
-        if latest_reading:
-            status.update(
-                {
-                    "current_power_watts": latest_reading.power_watts,
-                    "voltage": latest_reading.voltage,
-                    "current": latest_reading.current,
-                    "energy_today_kwh": latest_reading.energy_today_kwh,
-                    "energy_total_kwh": latest_reading.energy_total_kwh,
-                    "last_reading": latest_reading.timestamp,
-                    "is_on": latest_reading.power_watts > 0,
-                }
-            )
-        else:
-            status.update(
-                {
-                    "current_power_watts": 0,
-                    "is_on": False,
-                    "last_reading": None,
-                    "message": "Nenhuma leitura encontrada",
-                }
-            )
-
-        db.close()
-        return status
-
-    except HTTPException:
-        raise
-    except Exception as e:
-        logger.error(f"Erro ao obter status do dispositivo: {str(e)}")
-        raise HTTPException(
-            status_code=500, detail="Erro ao obter status do dispositivo"
-        )
+# NOTA: Endpoint temporariamente desabilitado - migração para Supabase
+# @app.get("/devices/{device_id}/status")
+# async def get_device_status(device_id: int):
+#     # TODO: Reimplementar usando Supabase REST API
+#     pass
 
 
 @app.get("/status/realtime")
@@ -359,40 +291,47 @@ async def get_device_trends(device_id: int, days: int = 30):
         raise HTTPException(status_code=500, detail="Erro ao obter tendências")
 
 
+# NOTA: Endpoint temporariamente desabilitado - migração para Supabase
+# @app.post("/devices/{device_id}/control")
+# async def control_device(device_id: int, action: str, background_tasks: BackgroundTasks):
+#     # TODO: Reimplementar usando Supabase REST API
+#     pass
+
+
 @app.post("/devices/{device_id}/control")
 async def control_device(
     device_id: int, action: str, background_tasks: BackgroundTasks
 ):
     """Controlar dispositivo (ligar/desligar)"""
     try:
-        db = next(get_db())
-        device = db.query(Device).filter(Device.id == device_id).first()
+        # Buscar dispositivo do Supabase
+        devices = get_supabase_data("devices", params={"id": f"eq.{device_id}"})
 
-        if not device:
-            db.close()
+        if not devices:
             raise HTTPException(status_code=404, detail="Dispositivo não encontrado")
 
-        if device.type.upper() != "TAPO":
-            db.close()
+        device = devices[0]
+
+        if device.get("type", "").upper() != "TAPO":
             raise HTTPException(
                 status_code=400,
                 detail="Controle não disponível para este tipo de dispositivo",
             )
 
+        device_name = device.get("name")
+
         # Executar ação em background
         if action.lower() == "on":
-            background_tasks.add_task(collector.tapo_client.turn_on, device.name)
-            message = f"Comando de ligar enviado para {device.name}"
+            background_tasks.add_task(collector.tapo_client.turn_on, device_name)
+            message = f"Comando de ligar enviado para {device_name}"
         elif action.lower() == "off":
-            background_tasks.add_task(collector.tapo_client.turn_off, device.name)
-            message = f"Comando de desligar enviado para {device.name}"
+            background_tasks.add_task(collector.tapo_client.turn_off, device_name)
+            message = f"Comando de desligar enviado para {device_name}"
         else:
-            db.close()
             raise HTTPException(
                 status_code=400, detail="Ação inválida. Use 'on' ou 'off'"
             )
 
-        db.close()
         return {"message": message}
 
     except HTTPException:
@@ -514,26 +453,25 @@ async def get_personalized_recommendations(device_data: Dict):
                 status_code=400, detail="ID do dispositivo não fornecido"
             )
 
-        # Obter informações do dispositivo
-        db = next(get_db())
-        device = db.query(Device).filter(Device.id == device_id).first()
+        # Obter informações do dispositivo do Supabase
+        devices = get_supabase_data("devices", params={"id": f"eq.{device_id}"})
 
-        if not device:
-            db.close()
+        if not devices:
             raise HTTPException(status_code=404, detail="Dispositivo não encontrado")
+
+        device = devices[0]
 
         # Obter tendências do dispositivo
         trends = energy_service.get_consumption_trends(device_id, days)
 
         if not trends:
-            db.close()
             raise HTTPException(
                 status_code=404, detail="Nenhum dado encontrado para este dispositivo"
             )
 
         # Gerar recomendações personalizadas
         question = f"""
-Baseado nos dados do dispositivo '{device.name}' ({device.location}) nos últimos {days} dias:
+Baseado nos dados do dispositivo '{device.get('name')}' ({device.get('location')}) nos últimos {days} dias:
 - Consumo total: {trends['total_energy_kwh']:.3f} kWh
 - Custo total: R$ {trends['total_cost']:.2f}
 - Média diária: {trends['average_daily_energy_kwh']:.3f} kWh
@@ -544,16 +482,14 @@ Forneça recomendações específicas para otimizar o consumo deste dispositivo.
 
         response = await llm_service.ask_question(question, "auto")
 
-        db.close()
-
         if "error" in response:
             raise HTTPException(status_code=500, detail=response["error"])
 
         return {
             "device_info": {
-                "name": device.name,
-                "location": device.location,
-                "equipment": device.equipment_connected,
+                "name": device.get("name"),
+                "location": device.get("location"),
+                "equipment": device.get("equipment_connected"),
             },
             "trends": trends,
             "recommendations": response["response"],
