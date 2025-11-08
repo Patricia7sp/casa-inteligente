@@ -51,17 +51,13 @@ async def lifespan(app: FastAPI):
     # Startup
     logger.info("Iniciando Casa Inteligente API...")
 
-    # Criar tabelas do banco de dados
-    try:
-        create_tables()
-        logger.info("Tabelas do banco de dados criadas/atualizadas")
-    except Exception as e:
-        logger.error(f"Erro ao criar tabelas: {str(e)}")
+    # NOTA: PostgreSQL local removido - usando apenas Supabase
+    logger.info("Sistema configurado para usar Supabase como banco de dados principal")
 
-    # Inicializar coletor
+    # Inicializar coletor (agora busca dados do Supabase)
     try:
         await collector.initialize()
-        logger.info("Coletor de dados inicializado")
+        logger.info("Coletor de dados inicializado com Supabase")
     except Exception as e:
         logger.error(f"Erro ao inicializar coletor: {str(e)}")
 

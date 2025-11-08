@@ -4,12 +4,11 @@ Agente coletor de dados de consumo de energia
 
 import asyncio
 import logging
+import requests
 from datetime import datetime, timedelta
 from typing import List, Dict
-from sqlalchemy.orm import Session
 
 from src.integrations.tapo_client import TapoClient
-from src.models.database import Device, EnergyReading, get_db
 from src.utils.config import settings
 
 logger = logging.getLogger(__name__)
@@ -23,75 +22,144 @@ class EnergyCollector:
             username=settings.tapo_username, password=settings.tapo_password
         )
         self.running = False
-        self.devices: List[Device] = []
+        self.devices: List[Dict] = []
+
+        # Configuração do Supabase
+        self.supabase_url = getattr(
+            settings,
+            "supabase_url",
+            "https://pqqrodiuuhckvdqawgeg.supabase.co",
+        )
+        self.supabase_key = getattr(
+            settings,
+            "supabase_anon_key",
+            "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InBxcXJvZGl1dWhja3ZkcWF3Z2VnIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjI0OTI0MTIsImV4cCI6MjA3ODA2ODQxMn0.ve7NIbFcZdTGa16O3Pttmpx2mxWgklvbPwwTSCHuDFs",
+        )
+
+    def _get_supabase_data(self, endpoint: str, params: dict = None) -> list:
+        """Buscar dados do Supabase via REST API"""
+        try:
+            url = f"{self.supabase_url}/rest/v1/{endpoint}"
+            headers = {
+                "apikey": self.supabase_key,
+                "Authorization": f"Bearer {self.supabase_key}",
+                "Content-Type": "application/json",
+            }
+            response = requests.get(url, headers=headers, params=params, timeout=10)
+            if response.status_code == 200:
+                return response.json()
+            else:
+                logger.error(f"Erro ao buscar {endpoint}: {response.status_code}")
+                return []
+        except Exception as e:
+            logger.error(f"Erro ao conectar ao Supabase: {str(e)}")
+            return []
+
+    def _save_to_supabase(self, endpoint: str, data: dict) -> bool:
+        """Salvar dados no Supabase via REST API"""
+        try:
+            url = f"{self.supabase_url}/rest/v1/{endpoint}"
+            headers = {
+                "apikey": self.supabase_key,
+                "Authorization": f"Bearer {self.supabase_key}",
+                "Content-Type": "application/json",
+                "Prefer": "return=minimal",
+            }
+            response = requests.post(url, headers=headers, json=data, timeout=10)
+            if response.status_code in [200, 201]:
+                return True
+            else:
+                logger.error(
+                    f"Erro ao salvar em {endpoint}: {response.status_code} - {response.text}"
+                )
+                return False
+        except Exception as e:
+            logger.error(f"Erro ao salvar no Supabase: {str(e)}")
+            return False
 
     async def initialize(self):
-        """Inicializar o coletor e carregar dispositivos"""
+        """Inicializar o coletor e carregar dispositivos do Supabase"""
         try:
-            # Carregar dispositivos do banco de dados
-            db = next(get_db())
-            self.devices = db.query(Device).filter(Device.is_active == True).all()
-            db.close()
+            # Carregar dispositivos do Supabase
+            self.devices = self._get_supabase_data("devices")
 
-            # Adicionar dispositivos ao cliente TAPO
+            # Filtrar apenas dispositivos ativos ou com is_active=None (TAPO)
+            self.devices = [d for d in self.devices if d.get("is_active") is not False]
+
+            # Adicionar dispositivos TAPO ao cliente
             for device in self.devices:
-                if device.type.upper() == "TAPO":
-                    await self.tapo_client.add_device(device.ip_address, device.name)
+                if device.get("type", "").upper() == "TAPO":
+                    ip_address = device.get("ip_address")
+                    name = device.get("name")
+                    if ip_address and name:
+                        await self.tapo_client.add_device(ip_address, name)
 
-            logger.info(f"Coletor inicializado com {len(self.devices)} dispositivos")
+            logger.info(
+                f"Coletor inicializado com {len(self.devices)} dispositivos do Supabase"
+            )
 
         except Exception as e:
             logger.error(f"Erro ao inicializar coletor: {str(e)}")
 
-    async def collect_device_data(self, device: Device) -> bool:
+    async def collect_device_data(self, device: Dict) -> bool:
         """
-        Coletar dados de um dispositivo específico
+        Coletar dados de um dispositivo específico e salvar no Supabase
 
         Args:
-            device: Dispositivo para coletar dados
+            device: Dicionário com dados do dispositivo
 
         Returns:
             bool: True se coletado com sucesso
         """
         try:
-            if device.type.upper() == "TAPO":
-                data = await self.tapo_client.get_energy_usage(device.name)
+            device_type = device.get("type", "").upper()
+            device_name = device.get("name", "Unknown")
+            device_id = device.get("id")
+
+            if device_type == "TAPO":
+                data = await self.tapo_client.get_energy_usage(device_name)
 
                 if data:
-                    # Salvar no banco de dados
-                    db = next(get_db())
+                    # Preparar dados para salvar no Supabase
+                    reading_data = {
+                        "device_id": device_id,
+                        "timestamp": (
+                            data["timestamp"].isoformat()
+                            if isinstance(data["timestamp"], datetime)
+                            else data["timestamp"]
+                        ),
+                        "power_watts": float(data["power_watts"]),
+                        "voltage": float(data.get("voltage", 0)),
+                        "current": float(data.get("current", 0)),
+                        "energy_kwh": float(data.get("energy_today_kwh", 0)),
+                    }
 
-                    reading = EnergyReading(
-                        device_id=device.id,
-                        timestamp=data["timestamp"],
-                        power_watts=data["power_watts"],
-                        voltage=data["voltage"],
-                        current=data["current"],
-                        energy_today_kwh=data["energy_today_kwh"],
-                        energy_total_kwh=data["energy_total_kwh"],
-                    )
+                    # Salvar no Supabase
+                    success = self._save_to_supabase("energy_readings", reading_data)
 
-                    db.add(reading)
-                    db.commit()
-                    db.close()
-
-                    logger.info(
-                        f"Dados coletados do dispositivo {device.name}: {data['power_watts']:.2f}W"
-                    )
-                    return True
+                    if success:
+                        logger.info(
+                            f"✅ Dados coletados e salvos no Supabase - {device_name}: {data['power_watts']:.2f}W"
+                        )
+                        return True
+                    else:
+                        logger.error(
+                            f"❌ Falha ao salvar dados no Supabase - {device_name}"
+                        )
+                        return False
                 else:
                     logger.warning(
-                        f"Não foi possível obter dados do dispositivo {device.name}"
+                        f"⚠️ Não foi possível obter dados do dispositivo {device_name}"
                     )
                     return False
 
             else:
-                logger.warning(f"Tipo de dispositivo não suportado: {device.type}")
+                logger.warning(f"⚠️ Tipo de dispositivo não suportado: {device_type}")
                 return False
 
         except Exception as e:
             logger.error(
-                f"Erro ao coletar dados do dispositivo {device.name}: {str(e)}"
+                f"❌ Erro ao coletar dados do dispositivo {device.get('name', 'Unknown')}: {str(e)}"
             )
             return False
 
@@ -105,7 +173,8 @@ class EnergyCollector:
         results = {}
 
         for device in self.devices:
-            results[device.name] = await self.collect_device_data(device)
+            device_name = device.get("name", "Unknown")
+            results[device_name] = await self.collect_device_data(device)
 
         return results
 
@@ -148,14 +217,17 @@ class EnergyCollector:
         status = {}
 
         for device in self.devices:
+            device_name = device.get("name", "Unknown")
+            device_type = device.get("type", "").upper()
+
             try:
-                if device.type.upper() == "TAPO":
-                    device_info = await self.tapo_client.get_device_info(device.name)
-                    status[device.name] = {
-                        "device_id": device.id,
-                        "ip_address": device.ip_address,
-                        "location": device.location,
-                        "equipment": device.equipment_connected,
+                if device_type == "TAPO":
+                    device_info = await self.tapo_client.get_device_info(device_name)
+                    status[device_name] = {
+                        "device_id": device.get("id"),
+                        "ip_address": device.get("ip_address"),
+                        "location": device.get("location"),
+                        "equipment": device.get("equipment_connected"),
                         "is_online": device_info is not None,
                         "is_on": (
                             device_info.get("device_on", False)
@@ -164,23 +236,23 @@ class EnergyCollector:
                         ),
                     }
                 else:
-                    status[device.name] = {
-                        "device_id": device.id,
-                        "ip_address": device.ip_address,
-                        "location": device.location,
-                        "equipment": device.equipment_connected,
+                    status[device_name] = {
+                        "device_id": device.get("id"),
+                        "ip_address": device.get("ip_address"),
+                        "location": device.get("location"),
+                        "equipment": device.get("equipment_connected"),
                         "is_online": False,
                         "is_on": False,
                     }
             except Exception as e:
                 logger.error(
-                    f"Erro ao obter status do dispositivo {device.name}: {str(e)}"
+                    f"Erro ao obter status do dispositivo {device_name}: {str(e)}"
                 )
-                status[device.name] = {
-                    "device_id": device.id,
-                    "ip_address": device.ip_address,
-                    "location": device.location,
-                    "equipment": device.equipment_connected,
+                status[device_name] = {
+                    "device_id": device.get("id"),
+                    "ip_address": device.get("ip_address"),
+                    "location": device.get("location"),
+                    "equipment": device.get("equipment_connected"),
                     "is_online": False,
                     "is_on": False,
                 }
