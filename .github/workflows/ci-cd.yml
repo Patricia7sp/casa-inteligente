@@ -172,11 +172,14 @@ jobs:
           --region us-central1 \
           --platform managed \
           --allow-unauthenticated \
+          --port 8080 \
           --memory 1Gi \
           --cpu 1 \
           --timeout 300 \
           --max-instances 10 \
-          --set-env-vars DATABASE_URL=${{ secrets.DATABASE_URL }} \
+          --min-instances 1 \
+          --set-env-vars SUPABASE_URL=${{ secrets.SUPABASE_URL }} \
+          --set-env-vars SUPABASE_ANON_KEY=${{ secrets.SUPABASE_ANON_KEY }} \
           --set-env-vars REDIS_URL=${{ secrets.REDIS_URL }} \
           --set-env-vars TAPO_USERNAME=${{ secrets.TAPO_USERNAME }} \
           --set-env-vars TAPO_PASSWORD=${{ secrets.TAPO_PASSWORD }} \
@@ -185,7 +188,10 @@ jobs:
           --set-env-vars EMAIL_USERNAME=${{ secrets.EMAIL_USERNAME }} \
           --set-env-vars EMAIL_PASSWORD=${{ secrets.EMAIL_PASSWORD }} \
           --set-env-vars OPENAI_API_KEY=${{ secrets.OPENAI_API_KEY }} \
-          --set-env-vars GOOGLE_AI_API_KEY=${{ secrets.GOOGLE_AI_API_KEY }}
+          --set-env-vars GOOGLE_AI_API_KEY=${{ secrets.GOOGLE_AI_API_KEY }} \
+          --set-env-vars ENABLE_COLLECTOR=true \
+          --set-env-vars COLLECTOR_INIT_TIMEOUT_SECONDS=20 \
+          --set-env-vars COLLECTION_INTERVAL_MINUTES=15
 
   build_streamlit:
     needs: [security]
