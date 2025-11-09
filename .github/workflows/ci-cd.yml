@@ -189,8 +189,8 @@ jobs:
           --set-env-vars EMAIL_PASSWORD=${{ secrets.EMAIL_PASSWORD }} \
           --set-env-vars OPENAI_API_KEY=${{ secrets.OPENAI_API_KEY }} \
           --set-env-vars GOOGLE_AI_API_KEY=${{ secrets.GOOGLE_AI_API_KEY }} \
-          --set-env-vars ENABLE_COLLECTOR=true \
-          --set-env-vars COLLECTOR_INIT_TIMEOUT_SECONDS=20 \
+          --set-env-vars ENABLE_COLLECTOR=false \
+          --set-env-vars COLLECTOR_INIT_TIMEOUT_SECONDS=5 \
           --set-env-vars COLLECTION_INTERVAL_MINUTES=15
 
   build_streamlit:

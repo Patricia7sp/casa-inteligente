@@ -100,22 +100,23 @@ collector_task: Optional[asyncio.Task] = None
 async def launch_collector_background() -> None:
     """Inicializar e iniciar coleta contínua em background."""
     try:
+        logger.info("Iniciando coletor em background...")
         await asyncio.wait_for(
             collector.initialize(),
             timeout=settings.collector_init_timeout_seconds,
         )
-        logger.info("Coletor inicializado com sucesso")
+        logger.info("✅ Coletor inicializado com sucesso")
         await collector.start_collection()
     except asyncio.TimeoutError:
-        logger.error(
-            "Tempo excedido ao inicializar coletor (%ss). Continuando sem coleta.",
+        logger.warning(
+            "⏱️ Timeout ao inicializar coletor (%ss). Dispositivos podem estar inacessíveis. Continuando sem coleta.",
             settings.collector_init_timeout_seconds,
         )
     except asyncio.CancelledError:
         logger.info("Tarefa do coletor cancelada durante shutdown")
         raise
     except Exception as e:
-        logger.error(f"Erro inesperado ao iniciar coletor: {str(e)}")
+        logger.warning(f"⚠️ Erro ao iniciar coletor (continuando sem coleta): {str(e)}")
 
 
 @asynccontextmanager
