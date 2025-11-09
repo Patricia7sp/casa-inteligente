@@ -6,7 +6,7 @@ import asyncio
 import logging
 from datetime import datetime, timedelta
 from contextlib import asynccontextmanager
-from typing import List, Dict
+from typing import List, Dict, Optional
 
 from fastapi import FastAPI, HTTPException, BackgroundTasks
 from fastapi.middleware.cors import CORSMiddleware
@@ -23,7 +23,15 @@ from src.services.energy_service import (
     get_device_monthly_stats,
     get_devices_ranking,
 )
-from src.services.notification_service import notification_service
+
+try:
+    from src.services.notification_service import notification_service
+except Exception as notification_import_error:
+    notification_service = None  # notifications optional
+    logging.getLogger(__name__).warning(
+        "Serviço de notificação não está disponível: %s",
+        notification_import_error,
+    )
 from src.services.llm_service import llm_service
 from src.utils.config import settings
 from src.utils.logger import setup_logging
@@ -86,7 +94,28 @@ def save_to_supabase(endpoint: str, data: dict) -> bool:
 collector = EnergyCollector()
 
 # Variável global para o coletor
-collector_task = None
+collector_task: Optional[asyncio.Task] = None
+
+
+async def launch_collector_background() -> None:
+    """Inicializar e iniciar coleta contínua em background."""
+    try:
+        await asyncio.wait_for(
+            collector.initialize(),
+            timeout=settings.collector_init_timeout_seconds,
+        )
+        logger.info("Coletor inicializado com sucesso")
+        await collector.start_collection()
+    except asyncio.TimeoutError:
+        logger.error(
+            "Tempo excedido ao inicializar coletor (%ss). Continuando sem coleta.",
+            settings.collector_init_timeout_seconds,
+        )
+    except asyncio.CancelledError:
+        logger.info("Tarefa do coletor cancelada durante shutdown")
+        raise
+    except Exception as e:
+        logger.error(f"Erro inesperado ao iniciar coletor: {str(e)}")
 
 
 @asynccontextmanager
@@ -98,22 +127,23 @@ async def lifespan(app: FastAPI):
     # NOTA: PostgreSQL local removido - usando apenas Supabase
     logger.info("Sistema configurado para usar Supabase como banco de dados principal")
 
-    # Inicializar coletor (agora busca dados do Supabase)
-    try:
-        await collector.initialize()
-        logger.info("Coletor de dados inicializado com Supabase")
-    except Exception as e:
-        logger.error(f"Erro ao inicializar coletor: {str(e)}")
-
-    # Iniciar coleta em background
     global collector_task
-    collector_task = asyncio.create_task(collector.start_collection())
-    logger.info("Coleta de dados iniciada em background")
+    if settings.enable_collector:
+        logger.info("Coletor habilitado - iniciando tarefa em background")
+        collector_task = asyncio.create_task(launch_collector_background())
+    else:
+        logger.warning(
+            "Coletor desabilitado por configuração (ENABLE_COLLECTOR=false). "
+            "Aplicação operando apenas com dados existentes no Supabase."
+        )
 
     # Enviar notificação de sistema online
-    await notification_service.send_system_notification(
-        "🟢 Sistema Casa Inteligente iniciado com sucesso!", "INFO"
-    )
+    if notification_service:
+        asyncio.create_task(
+            notification_service.send_system_notification(
+                "🟢 Sistema Casa Inteligente iniciado com sucesso!", "INFO"
+            )
+        )
 
     yield
 
@@ -121,7 +151,7 @@ async def lifespan(app: FastAPI):
     logger.info("Desligando Casa Inteligente API...")
 
     # Parar coletor
-    if collector_task:
+    if collector_task and not collector_task.done():
         collector.stop_collection()
         collector_task.cancel()
         try:
@@ -130,9 +160,12 @@ async def lifespan(app: FastAPI):
             pass
 
     # Enviar notificação de sistema offline
-    await notification_service.send_system_notification(
-        "🔴 Sistema Casa Inteligente desligado", "WARNING"
-    )
+    if notification_service:
+        asyncio.create_task(
+            notification_service.send_system_notification(
+                "🔴 Sistema Casa Inteligente desligado", "WARNING"
+            )
+        )
 
 
 # Criar aplicação FastAPI

@@ -65,6 +65,8 @@ class Settings(BaseSettings):
     # Monitoramento
     collection_interval_minutes: int = 15
     report_time: str = "20:00"  # Horário dos relatórios diários
+    enable_collector: bool = True  # Reativado após deploy bem-sucedido
+    collector_init_timeout_seconds: int = 20
 
     # Alertas
     anomaly_threshold: float = 2.0  # Multiplicador da média para detectar anomalias
