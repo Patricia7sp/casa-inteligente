@@ -201,11 +201,12 @@ async def root():
 
 @app.get("/health")
 async def health_check():
-    """Verificar saúde da API"""
+    """Verificar saúde da API - resposta rápida para Cloud Run"""
     return {
         "status": "healthy",
         "timestamp": datetime.utcnow(),
-        "collector_running": collector.running,
+        "collector_enabled": settings.enable_collector,
+        "collector_running": collector.running if settings.enable_collector else False,
     }
 
 
