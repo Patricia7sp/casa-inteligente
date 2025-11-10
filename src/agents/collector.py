@@ -131,7 +131,7 @@ class EnergyCollector:
                         "power_watts": float(data["power_watts"]),
                         "voltage": float(data.get("voltage", 0)),
                         "current": float(data.get("current", 0)),
-                        "energy_kwh": float(data.get("energy_today_kwh", 0)),
+                        "energy_today_kwh": float(data.get("energy_today_kwh", 0)),
                     }
 
                     # Salvar no Supabase
