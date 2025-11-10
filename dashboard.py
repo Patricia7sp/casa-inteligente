@@ -325,8 +325,14 @@ def build_summary_cards(devices_data, readings_data):
     if readings_data:
         last_timestamp = max(r.get("timestamp") for r in readings_data)
         if last_timestamp:
-            time_diff = datetime.now() - pd.to_datetime(last_timestamp)
-            last_reading = f"{max(time_diff.seconds // 60, 0)} min atrás"
+            try:
+                time_diff = datetime.now() - pd.to_datetime(
+                    last_timestamp, errors="coerce"
+                )
+                if pd.notna(time_diff):
+                    last_reading = f"{max(time_diff.seconds // 60, 0)} min atrás"
+            except:
+                last_reading = "N/A"
 
     with col1:
         st.metric(
@@ -572,7 +578,7 @@ def render_tapo_dashboard():
 
         if not readings_df_latest.empty:
             readings_df_latest["timestamp"] = pd.to_datetime(
-                readings_df_latest["timestamp"]
+                readings_df_latest["timestamp"], errors="coerce"
             )
 
             readings_df_latest = readings_df_latest.rename(
@@ -688,7 +694,7 @@ def render_tapo_dashboard():
 
     if "last_reading" in display_df.columns:
         display_df["Última Leitura"] = pd.to_datetime(
-            display_df["last_reading"]
+            display_df["last_reading"], errors="coerce"
         ).dt.strftime("%d/%m %H:%M")
 
     table_columns = [
