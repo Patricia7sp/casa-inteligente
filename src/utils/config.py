@@ -20,7 +20,7 @@ class Settings(BaseSettings):
         "postgresql://postgres:casa_inteligente_2024@localhost:5432/casa_inteligente"
     )
     redis_url: str = "redis://localhost:6379"
-    
+
     # Supabase (banco de dados principal)
     supabase_url: str = "https://pqqrodiuuhckvdqawgeg.supabase.co"
     supabase_anon_key: str = ""
