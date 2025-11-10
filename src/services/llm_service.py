@@ -74,6 +74,25 @@ class LLMService:
         else:
             self.gemini_model_name = None
 
+    def _parse_timestamp(self, timestamp_str: str) -> Optional[datetime]:
+        """Parse timestamp com diferentes formatos"""
+        if not timestamp_str:
+            return None
+        try:
+            # Remover Z e adicionar +00:00
+            ts = timestamp_str.replace("Z", "+00:00")
+            # Tentar parse direto
+            return datetime.fromisoformat(ts)
+        except:
+            try:
+                # Tentar parse sem microsegundos
+                return datetime.strptime(timestamp_str[:19], "%Y-%m-%dT%H:%M:%S")
+            except:
+                logger.warning(
+                    f"Não foi possível fazer parse do timestamp: {timestamp_str}"
+                )
+                return None
+
     def _get_supabase_data(self, endpoint: str, params: dict = None) -> list:
         """Buscar dados do Supabase via REST API"""
         try:
@@ -112,23 +131,30 @@ class LLMService:
             # Buscar leituras de hoje para cálculo de energia
             now = datetime.utcnow()
             today_start = now.replace(hour=0, minute=0, second=0, microsecond=0)
-            readings_today = [
-                r
-                for r in all_readings
-                if datetime.fromisoformat(r.get("timestamp", "").replace("Z", "+00:00"))
-                >= today_start
-            ]
+            readings_today = []
+            for r in all_readings:
+                ts = self._parse_timestamp(r.get("timestamp", ""))
+                if ts and ts >= today_start:
+                    readings_today.append(r)
 
             # Calcular informações sobre atualização dos dados
             data_freshness = ""
             latest_reading_time = None
             if all_readings:
-                latest_reading_time = datetime.fromisoformat(
-                    all_readings[0].get("timestamp", "").replace("Z", "+00:00")
+                latest_reading_time = self._parse_timestamp(
+                    all_readings[0].get("timestamp", "")
                 )
-                time_since_update = (
-                    now.replace(tzinfo=latest_reading_time.tzinfo) - latest_reading_time
-                ).total_seconds()
+                if latest_reading_time:
+                    # Garantir que ambos têm timezone ou nenhum tem
+                    if latest_reading_time.tzinfo:
+                        now_tz = now.replace(tzinfo=latest_reading_time.tzinfo)
+                        time_since_update = (
+                            now_tz - latest_reading_time
+                        ).total_seconds()
+                    else:
+                        time_since_update = (now - latest_reading_time).total_seconds()
+                else:
+                    time_since_update = 999999  # Valor alto para indicar sem dados
 
                 if time_since_update < 900:  # < 15 min
                     data_freshness = f"✅ Dados atualizados há {int(time_since_update / 60)} minutos (sistema coletando normalmente)"
@@ -226,22 +252,27 @@ DISPOSITIVOS DO USUÁRIO (MONITORADOS NESTE SISTEMA):
                 last_reading_info = ""
                 if last_reading_time:
                     try:
-                        last_time = datetime.fromisoformat(
-                            last_reading_time.replace("Z", "+00:00")
-                        )
-                        time_diff = (
-                            datetime.utcnow().replace(tzinfo=last_time.tzinfo)
-                            - last_time
-                        )
-                        if time_diff.total_seconds() < 3600:
+                        last_time = self._parse_timestamp(last_reading_time)
+                        if last_time:
+                            if last_time.tzinfo:
+                                now_tz = datetime.utcnow().replace(
+                                    tzinfo=last_time.tzinfo
+                                )
+                                time_diff = now_tz - last_time
+                            else:
+                                time_diff = datetime.utcnow() - last_time
+                        else:
+                            time_diff = None
+
+                        if time_diff and time_diff.total_seconds() < 3600:
                             last_reading_info = (
                                 f" (há {int(time_diff.total_seconds() / 60)} min)"
                             )
-                        elif time_diff.total_seconds() < 86400:
+                        elif time_diff and time_diff.total_seconds() < 86400:
                             last_reading_info = (
                                 f" (há {int(time_diff.total_seconds() / 3600)} h)"
                             )
-                        else:
+                        elif time_diff:
                             last_reading_info = (
                                 f" (há {int(time_diff.total_seconds() / 86400)} dias)"
                             )
