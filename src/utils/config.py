@@ -15,11 +15,15 @@ class Settings(BaseSettings):
     app_version: str = "1.0.0"
     debug: bool = False
 
-    # Banco de Dados PostgreSQL
+    # Banco de Dados PostgreSQL (legado - não mais usado)
     database_url: str = (
         "postgresql://postgres:casa_inteligente_2024@localhost:5432/casa_inteligente"
     )
     redis_url: str = "redis://localhost:6379"
+    
+    # Supabase (banco de dados principal)
+    supabase_url: str = "https://pqqrodiuuhckvdqawgeg.supabase.co"
+    supabase_anon_key: str = ""
 
     # APIs de Tomadas
     tapo_username: str = ""
