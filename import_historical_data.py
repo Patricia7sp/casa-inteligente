@@ -13,9 +13,25 @@ sys.path.insert(0, os.path.join(os.path.dirname(__file__), 'src'))
 from tapo import ApiClient
 from tapo.requests import EnergyDataInterval
 from src.utils.config import settings
+from src.integrations.tapo_client import TapoClient
 
 SUPABASE_URL = "https://pqqrodiuuhckvdqawgeg.supabase.co"
 SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InBxcXJvZGl1dWhja3ZkcWF3Z2VnIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjI0OTI0MTIsImV4cCI6MjA3ODA2ODQxMn0.ve7NIbFcZdTGa16O3Pttmpx2mxWgklvbPwwTSCHuDFs"
+
+
+def update_device_ip(device_id: int, new_ip: str) -> bool:
+    response = requests.patch(
+        f"{SUPABASE_URL}/rest/v1/devices?id=eq.{device_id}",
+        headers={
+            "apikey": SUPABASE_KEY,
+            "Authorization": f"Bearer {SUPABASE_KEY}",
+            "Content-Type": "application/json",
+            "Prefer": "return=minimal",
+        },
+        json={"ip_address": new_ip},
+        timeout=10,
+    )
+    return response.status_code in [200, 204]
 
 def get_devices():
     """Buscar dispositivos TAPO do Supabase"""
@@ -56,7 +72,7 @@ def save_reading(device_id, timestamp, energy_kwh, power_watts=0):
     
     return response.status_code in [200, 201]
 
-async def import_device_history(device):
+async def import_device_history(device, tapo_client: TapoClient):
     """Importar histórico de um dispositivo"""
     device_id = device['id']
     device_name = device['name']
@@ -65,10 +81,45 @@ async def import_device_history(device):
     print(f"\n📱 Importando histórico de: {device_name} ({ip})")
     print("=" * 80)
     
+    max_retries = 3
+    retry_delay = 2
+    
+    for attempt in range(max_retries):
+        try:
+            if attempt > 0:
+                print(f"🔄 Tentativa {attempt + 1}/{max_retries}...")
+                await asyncio.sleep(retry_delay)
+            
+            # Conectar ao dispositivo com fallback automático
+            success, resolved_ip = await tapo_client.add_device(ip, device_name)
+            if not success:
+                if attempt < max_retries - 1:
+                    continue
+                print(f"❌ Não foi possível conectar ao dispositivo {device_name} após {max_retries} tentativas. Pulando...")
+                return 0
+
+            if resolved_ip and resolved_ip != ip and update_device_ip(device_id, resolved_ip):
+                print(f"🔄 IP atualizado automaticamente: {ip} -> {resolved_ip}")
+                ip = resolved_ip
+
+            tapo_device = tapo_client.get_device_handler(device_name)
+            if tapo_device is None:
+                if attempt < max_retries - 1:
+                    continue
+                print(f"❌ Handler do dispositivo {device_name} não encontrado após conexão")
+                return 0
+            
+            # Se chegou aqui, conexão bem-sucedida
+            break
+            
+        except Exception as e:
+            if attempt < max_retries - 1:
+                print(f"⚠️  Erro na tentativa {attempt + 1}: {str(e)}")
+                continue
+            print(f"❌ Erro ao conectar após {max_retries} tentativas: {str(e)}")
+            return 0
+    
     try:
-        # Conectar ao dispositivo
-        client = ApiClient(settings.tapo_username, settings.tapo_password)
-        tapo_device = await client.p110(ip)
         
         # Obter dados diários (últimos 90 dias)
         print("📅 Buscando dados diários...")
@@ -122,7 +173,8 @@ async def main():
     
     # Buscar dispositivos
     devices = get_devices()
-    tapo_devices = [d for d in devices if d.get('is_active', True)]
+    # Incluir dispositivos com is_active=True ou is_active=None (null)
+    tapo_devices = [d for d in devices if d.get('is_active') != False]
     
     print(f"📱 Encontrados {len(tapo_devices)} dispositivos TAPO ativos")
     
@@ -130,11 +182,13 @@ async def main():
         print("❌ Nenhum dispositivo TAPO encontrado")
         return
     
+    tapo_client = TapoClient(settings.tapo_username, settings.tapo_password)
+
     # Importar cada dispositivo
     total_imported = 0
-    
+
     for device in tapo_devices:
-        imported = await import_device_history(device)
+        imported = await import_device_history(device, tapo_client)
         total_imported += imported
     
     print()

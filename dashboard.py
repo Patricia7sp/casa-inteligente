@@ -381,8 +381,7 @@ def create_power_gauge(value, title, max_value=100):
                     "thickness": 0.75,
                     "value": max_value * 0.9,
                 },
-            },
-        )
+            }, )
     )
 
     fig.update_layout(
@@ -392,6 +391,198 @@ def create_power_gauge(value, title, max_value=100):
         font_color="#ffffff",
     )
 
+    return fig
+
+
+def aggregate_energy_data(df, freq='D'):
+    """
+    Agregar dados de energia por período (hora, dia, mês)
+    
+    Args:
+        df: DataFrame com colunas timestamp, energy_today_kwh, device_id
+        freq: Frequência de agregação ('H'=hora, 'D'=dia, 'M'=mês)
+    
+    Returns:
+        DataFrame agregado com totais por período
+    """
+    if df.empty or 'timestamp' not in df.columns:
+        return pd.DataFrame()
+    
+    df = df.copy()
+    df['timestamp'] = pd.to_datetime(df['timestamp'], errors='coerce')
+    df = df.dropna(subset=['timestamp'])
+    
+    # Agrupar por período e dispositivo
+    df['period'] = df['timestamp'].dt.to_period(freq)
+    
+    # Calcular energia total por período
+    # Usar o máximo de energy_today_kwh por dia (acumulado do dia)
+    if 'energy_today_kwh' in df.columns:
+        aggregated = df.groupby(['period', 'device_id']).agg({
+            'energy_today_kwh': 'max',  # Máximo do dia (valor acumulado)
+            'power_watts': 'mean',       # Média de potência
+            'timestamp': 'first'
+        }).reset_index()
+    else:
+        # Calcular energia a partir da potência (kWh = W * h / 1000)
+        hours_in_period = {'H': 1, 'D': 24, 'M': 720}
+        df['energy_kwh'] = df['power_watts'] * hours_in_period.get(freq, 24) / 1000
+        aggregated = df.groupby(['period', 'device_id']).agg({
+            'energy_kwh': 'sum',
+            'power_watts': 'mean',
+            'timestamp': 'first'
+        }).reset_index()
+    
+    aggregated['period'] = aggregated['period'].dt.to_timestamp()
+    return aggregated
+
+
+def create_daily_consumption_timeline(df, color_map=None, tariff=0.862):
+    """Criar gráfico de linha temporal com consumo diário acumulado"""
+    
+    if df.empty:
+        return go.Figure()
+    
+    # Agregar por dia
+    daily_data = aggregate_energy_data(df, freq='D')
+    
+    if daily_data.empty:
+        return go.Figure()
+    
+    # Agrupar por dia (somar todos os dispositivos)
+    daily_totals = daily_data.groupby('period').agg({
+        'energy_today_kwh': 'sum' if 'energy_today_kwh' in daily_data.columns else 'sum',
+        'power_watts': 'mean'
+    }).reset_index()
+    
+    # Calcular custo
+    daily_totals['cost'] = daily_totals.get('energy_today_kwh', daily_totals.get('energy_kwh', 0)) * tariff
+    
+    # Criar gráfico com duas linhas (energia e custo)
+    fig = make_subplots(
+        rows=2, cols=1,
+        subplot_titles=('Consumo Diário (kWh)', 'Custo Diário (R$)'),
+        vertical_spacing=0.15,
+        row_heights=[0.6, 0.4]
+    )
+    
+    # Linha de consumo
+    fig.add_trace(
+        go.Scatter(
+            x=daily_totals['period'],
+            y=daily_totals.get('energy_today_kwh', daily_totals.get('energy_kwh', 0)),
+            mode='lines+markers',
+            name='Consumo (kWh)',
+            line=dict(color='#667eea', width=3),
+            marker=dict(size=8),
+            fill='tozeroy',
+            fillcolor='rgba(102, 126, 234, 0.2)'
+        ),
+        row=1, col=1
+    )
+    
+    # Linha de custo
+    fig.add_trace(
+        go.Scatter(
+            x=daily_totals['period'],
+            y=daily_totals['cost'],
+            mode='lines+markers',
+            name='Custo (R$)',
+            line=dict(color='#f5576c', width=3),
+            marker=dict(size=8),
+            fill='tozeroy',
+            fillcolor='rgba(245, 87, 108, 0.2)'
+        ),
+        row=2, col=1
+    )
+    
+    fig.update_layout(
+        height=600,
+        plot_bgcolor='rgba(0,0,0,0)',
+        paper_bgcolor='rgba(0,0,0,0)',
+        font_color='#ffffff',
+        showlegend=True,
+        title_text='📊 Consumo e Custo Diário ao Longo do Tempo',
+        title_font_size=18
+    )
+    
+    fig.update_xaxes(title_text='Data', row=2, col=1)
+    fig.update_yaxes(title_text='kWh', row=1, col=1)
+    fig.update_yaxes(title_text='R$', row=2, col=1)
+    
+    return fig
+
+
+def create_monthly_totals_chart(df, color_map=None, tariff=0.862):
+    """Criar gráfico de totais mensais para comparação ao longo do tempo"""
+    
+    if df.empty:
+        return go.Figure()
+    
+    # Agregar por mês
+    monthly_data = aggregate_energy_data(df, freq='M')
+    
+    if monthly_data.empty:
+        return go.Figure()
+    
+    # Agrupar por mês (somar todos os dispositivos)
+    monthly_totals = monthly_data.groupby('period').agg({
+        'energy_today_kwh': 'sum' if 'energy_today_kwh' in monthly_data.columns else 'sum',
+        'power_watts': 'mean'
+    }).reset_index()
+    
+    # Calcular custo
+    monthly_totals['cost'] = monthly_totals.get('energy_today_kwh', monthly_totals.get('energy_kwh', 0)) * tariff
+    monthly_totals['month_label'] = monthly_totals['period'].dt.strftime('%b/%Y')
+    
+    # Criar gráfico de barras com duas séries
+    fig = make_subplots(
+        rows=1, cols=2,
+        subplot_titles=('Consumo Mensal (kWh)', 'Custo Mensal (R$)'),
+        horizontal_spacing=0.12
+    )
+    
+    # Barras de consumo
+    fig.add_trace(
+        go.Bar(
+            x=monthly_totals['month_label'],
+            y=monthly_totals.get('energy_today_kwh', monthly_totals.get('energy_kwh', 0)),
+            name='Consumo (kWh)',
+            marker_color='#667eea',
+            text=monthly_totals.get('energy_today_kwh', monthly_totals.get('energy_kwh', 0)).round(2),
+            textposition='outside'
+        ),
+        row=1, col=1
+    )
+    
+    # Barras de custo
+    fig.add_trace(
+        go.Bar(
+            x=monthly_totals['month_label'],
+            y=monthly_totals['cost'],
+            name='Custo (R$)',
+            marker_color='#f5576c',
+            text=monthly_totals['cost'].round(2),
+            textposition='outside'
+        ),
+        row=1, col=2
+    )
+    
+    fig.update_layout(
+        height=450,
+        plot_bgcolor='rgba(0,0,0,0)',
+        paper_bgcolor='rgba(0,0,0,0)',
+        font_color='#ffffff',
+        showlegend=False,
+        title_text='📅 Comparação Mensal de Consumo e Custo',
+        title_font_size=18
+    )
+    
+    fig.update_xaxes(title_text='Mês', row=1, col=1)
+    fig.update_xaxes(title_text='Mês', row=1, col=2)
+    fig.update_yaxes(title_text='kWh', row=1, col=1)
+    fig.update_yaxes(title_text='R$', row=1, col=2)
+    
     return fig
 
 
@@ -670,13 +861,80 @@ def render_tapo_dashboard():
             history_df = history_df.dropna(subset=["display_label"])
 
     if not history_df.empty:
+        # Gráfico de linha temporal original (potência instantânea)
         fig_history = create_consumption_chart(
             history_df,
-            f"Histórico de Consumo (últimos {time_range_days} dia(s))",
+            f"Histórico de Potência Instantânea (últimos {time_range_days} dia(s))",
             color_field="display_label",
             color_map=color_map,
         )
         st.plotly_chart(fig_history, use_container_width=True)
+        
+        st.markdown("---")
+        
+        # Novos gráficos de agregação
+        st.markdown("### 📈 Análise de Consumo e Custo Agregados")
+        
+        # Gráfico de linha temporal diária (consumo acumulado por dia)
+        fig_daily = create_daily_consumption_timeline(history_df, color_map, tariff)
+        st.plotly_chart(fig_daily, use_container_width=True)
+        
+        st.markdown("---")
+        
+        # Gráfico de totais mensais
+        fig_monthly = create_monthly_totals_chart(history_df, color_map, tariff)
+        st.plotly_chart(fig_monthly, use_container_width=True)
+        
+        # Tabela de resumo com totais agregados
+        st.markdown("### 📊 Resumo de Totais Agregados")
+        
+        # Calcular totais por período
+        col1, col2, col3 = st.columns(3)
+        
+        # Total diário (média dos últimos dias)
+        daily_agg = aggregate_energy_data(history_df, freq='D')
+        if not daily_agg.empty:
+            daily_totals = daily_agg.groupby('period')['energy_today_kwh'].sum() if 'energy_today_kwh' in daily_agg.columns else daily_agg.groupby('period')['energy_kwh'].sum()
+            avg_daily_kwh = daily_totals.mean()
+            avg_daily_cost = avg_daily_kwh * tariff
+            
+            with col1:
+                st.metric(
+                    label="📅 Média Diária",
+                    value=f"{avg_daily_kwh:.2f} kWh",
+                    delta=f"R$ {avg_daily_cost:.2f}"
+                )
+        
+        # Total semanal (última semana)
+        last_7_days = history_df[history_df['timestamp'] >= (datetime.now() - timedelta(days=7))]
+        if not last_7_days.empty:
+            weekly_agg = aggregate_energy_data(last_7_days, freq='D')
+            if not weekly_agg.empty:
+                weekly_total = weekly_agg.groupby('period')['energy_today_kwh'].sum().sum() if 'energy_today_kwh' in weekly_agg.columns else weekly_agg.groupby('period')['energy_kwh'].sum().sum()
+                weekly_cost = weekly_total * tariff
+                
+                with col2:
+                    st.metric(
+                        label="📅 Últimos 7 Dias",
+                        value=f"{weekly_total:.2f} kWh",
+                        delta=f"R$ {weekly_cost:.2f}"
+                    )
+        
+        # Total mensal (último mês)
+        last_30_days = history_df[history_df['timestamp'] >= (datetime.now() - timedelta(days=30))]
+        if not last_30_days.empty:
+            monthly_agg = aggregate_energy_data(last_30_days, freq='D')
+            if not monthly_agg.empty:
+                monthly_total = monthly_agg.groupby('period')['energy_today_kwh'].sum().sum() if 'energy_today_kwh' in monthly_agg.columns else monthly_agg.groupby('period')['energy_kwh'].sum().sum()
+                monthly_cost = monthly_total * tariff
+                
+                with col3:
+                    st.metric(
+                        label="📅 Últimos 30 Dias",
+                        value=f"{monthly_total:.2f} kWh",
+                        delta=f"R$ {monthly_cost:.2f}"
+                    )
+        
     else:
         st.info(
             "Sem leituras recentes para os dispositivos TAPO no período selecionado."
