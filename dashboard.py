@@ -699,8 +699,17 @@ def render_tapo_dashboard():
 
     # Obter dados do Supabase
     devices_data = get_supabase_data("devices")
+    
+    # Buscar mais leituras para ter dados suficientes para análise
+    # Incluir últimos 90 dias de dados
+    from_date = (datetime.now() - timedelta(days=90)).isoformat()
     readings_data = get_supabase_data(
-        "energy_readings", params={"order": "timestamp.desc", "limit": "100"}
+        "energy_readings", 
+        params={
+            "order": "timestamp.desc", 
+            "timestamp": f"gte.{from_date}",
+            "limit": "10000"
+        }
     )
 
     if not devices_data:
@@ -945,6 +954,24 @@ def render_tapo_dashboard():
 
     display_df = devices_df.copy()
     display_df["Dispositivo"] = display_df["display_label"]
+    
+    # Calcular consumo médio diário baseado em dados históricos
+    if not history_df.empty:
+        for idx, device in display_df.iterrows():
+            device_id = device.get("id")
+            if device_id:
+                device_readings = history_df[history_df["device_id"] == device_id]
+                if not device_readings.empty and "energy_today_kwh" in device_readings.columns:
+                    # Média dos últimos 7 dias
+                    last_7_days = device_readings[
+                        device_readings["timestamp"] >= (datetime.now() - timedelta(days=7))
+                    ]
+                    if not last_7_days.empty:
+                        avg_daily_kwh = last_7_days["energy_today_kwh"].mean()
+                        # Converter para potência média (kWh/dia -> W)
+                        avg_power_w = (avg_daily_kwh * 1000) / 24
+                        display_df.at[idx, "current_power_watts"] = avg_power_w
+    
     display_df["Consumo Atual"] = display_df["current_power_watts"].apply(format_power)
     display_df["Status"] = display_df["is_active"].apply(
         lambda x: "🟢 Ativo" if x else "🔴 Inativo"
@@ -981,15 +1008,40 @@ def render_tapo_dashboard():
 
     projections = []
     for _, device in devices_df.iterrows():
-        current_power = device.get("current_power_watts", 0)
-        daily_energy = current_power * 24 / 1000
+        device_id = device.get("id")
+        display_label = device.get("display_label", "Dispositivo")
+        
+        # Calcular média diária baseada nos dados históricos reais
+        if not history_df.empty and device_id:
+            device_readings = history_df[history_df["device_id"] == device_id].copy()
+            
+            if not device_readings.empty and "energy_today_kwh" in device_readings.columns:
+                # Calcular média diária dos últimos 7 dias
+                last_7_days = device_readings[
+                    device_readings["timestamp"] >= (datetime.now() - timedelta(days=7))
+                ]
+                
+                if not last_7_days.empty:
+                    daily_energy = last_7_days["energy_today_kwh"].mean()
+                else:
+                    # Fallback: média de todos os dados disponíveis
+                    daily_energy = device_readings["energy_today_kwh"].mean()
+            else:
+                # Fallback: usar potência atual se disponível
+                current_power = device.get("current_power_watts", 0)
+                daily_energy = current_power * 24 / 1000
+        else:
+            # Sem dados históricos, usar potência atual
+            current_power = device.get("current_power_watts", 0)
+            daily_energy = current_power * 24 / 1000
+        
         weekly_energy = daily_energy * 7
         monthly_energy = daily_energy * 30
         monthly_cost = monthly_energy * tariff
 
         projections.append(
             {
-                "Dispositivo": device["display_label"],
+                "Dispositivo": display_label,
                 "Diário (kWh)": round(daily_energy, 2),
                 "Semanal (kWh)": round(weekly_energy, 2),
                 "Mensal (kWh)": round(monthly_energy, 2),
