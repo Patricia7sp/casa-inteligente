@@ -34,7 +34,7 @@ O Casa Inteligente é um sistema completo que permite:
 - Notificações do sistema
 
 ### 🎯 Dashboards
-- Interface web responsiva (Streamlit)
+- Interface web responsiva (React + Vite)
 - Gráficos interativos com Grafana
 - Visualização em tempo real
 - Relatórios personalizáveis
@@ -49,8 +49,9 @@ O Casa Inteligente é um sistema completo que permite:
 ## 🛠️ Tecnologias
 
 - **Backend**: Python 3.10, FastAPI, SQLAlchemy
+- **Frontend**: React, Vite, TypeScript, Tailwind CSS, Recharts
 - **Banco de Dados**: PostgreSQL, Redis
-- **Monitoramento**: Prometheus, Grafana, Streamlit
+- **Monitoramento**: Prometheus, Grafana
 - **Email Integration**: Gmail API, OAuth 2.0
 - **Containerização**: Docker, Docker Compose
 - **Deploy**: Google Cloud Run
@@ -189,10 +190,12 @@ curl -X POST http://localhost:8000/devices/1/control \
 
 ## 📊 Dashboards
 
-### Streamlit Dashboard
-Acesse `http://localhost:8501`
+### Frontend (React)
+Acesse `http://localhost:5173` (dev) ou `http://localhost:8080` (build via Docker)
 ```bash
-streamlit run dashboard.py
+cd frontend
+npm install
+npm run dev
 ```
 
 **Seções disponíveis:**
@@ -296,7 +299,7 @@ casa_inteligente/
 ├── data/               # Dados de runtime
 │   └── smartlife/                 # Dados SmartLife
 ├── docs/               # Documentação
-├── dashboard.py        # Dashboard Streamlit
+├── frontend/           # Dashboard React + Vite
 └── .github/workflows/  # CI/CD
 ```
 
@@ -322,7 +325,7 @@ Este projeto está licenciado sob a MIT License - veja o arquivo [LICENSE](LICEN
 
 - [x] Suporte para TP-Link TAPO
 - [x] Integração com SmartLife via email
-- [x] Dashboard Streamlit interativo
+- [x] Dashboard React interativo
 - [x] Monitoramento Prometheus/Grafana
 - [x] Gmail API para relatórios automáticos
 - [ ] Suporte para mais marcas de tomadas
@@ -351,8 +354,8 @@ python scripts/gmail_polling.py &
 # 2. Prometheus exporter (background)
 python src/services/prometheus_exporter.py &
 
-# 3. Dashboard Streamlit
-streamlit run dashboard.py
+# 3. Dashboard React
+cd frontend && npm install && npm run dev
 ```
 
 ### Métricas disponíveis:

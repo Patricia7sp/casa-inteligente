@@ -51,7 +51,7 @@ docker-compose ps
 ### 4. Acessar o Sistema
 
 **API Documentation:** http://localhost:8000/docs
-**Streamlit Dashboard:** http://localhost:8501
+**Frontend (Dashboard):** http://localhost:8080
 **Grafana:** http://localhost:3000 (admin/admin)
 **Prometheus:** http://localhost:9090
 
