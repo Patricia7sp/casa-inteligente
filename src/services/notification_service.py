@@ -296,7 +296,9 @@ _Casa Inteligente - Monitoramento 24/7_"""
             bool: True se enviado com sucesso
         """
         try:
-            level_emoji = {"INFO": "ℹ️", "WARNING": "⚠️", "ERROR": "❌"}.get(level, "ℹ️")
+            level_emoji = {"INFO": "ℹ️", "WARNING": "⚠️", "ERROR": "❌"}.get(
+                level, "ℹ️"
+            )
 
             system_message = f"""{level_emoji} *Notificação do Sistema - Casa Inteligente*
 

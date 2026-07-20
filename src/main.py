@@ -12,7 +12,6 @@ from fastapi import FastAPI, HTTPException, BackgroundTasks
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 import uvicorn
-import requests
 
 from src.integrations.tapo_client import TapoClient
 from src.integrations.nova_digital_client import NovaDigitalClient, DeviceClientFactory
@@ -22,7 +21,16 @@ from src.services.energy_service import (
     get_device_weekly_consumption,
     get_device_monthly_stats,
     get_devices_ranking,
+    fetch_tapo_devices_and_readings,
+    build_energy_overview,
+    build_power_history,
+    build_daily_totals,
+    build_monthly_totals,
+    build_projections,
+    build_device_detail,
+    load_smartlife_snapshot,
 )
+from src.services.supabase_client import get_supabase_data, save_to_supabase
 
 try:
     from src.services.notification_service import notification_service
@@ -40,54 +48,10 @@ from src.utils.logger import setup_logging
 setup_logging()
 logger = logging.getLogger(__name__)
 
-# Configuração do Supabase
-SUPABASE_URL = getattr(
-    settings,
-    "supabase_url",
-    "https://pqqrodiuuhckvdqawgeg.supabase.co",
-)
-SUPABASE_KEY = getattr(
-    settings,
-    "supabase_anon_key",
-    "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InBxcXJvZGl1dWhja3ZkcWF3Z2VnIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjI0OTI0MTIsImV4cCI6MjA3ODA2ODQxMn0.ve7NIbFcZdTGa16O3Pttmpx2mxWgklvbPwwTSCHuDFs",
-)
-
-
-def get_supabase_data(endpoint: str, params: dict = None) -> list:
-    """Buscar dados do Supabase via REST API"""
-    try:
-        url = f"{SUPABASE_URL}/rest/v1/{endpoint}"
-        headers = {
-            "apikey": SUPABASE_KEY,
-            "Authorization": f"Bearer {SUPABASE_KEY}",
-            "Content-Type": "application/json",
-        }
-        response = requests.get(url, headers=headers, params=params, timeout=10)
-        if response.status_code == 200:
-            return response.json()
-        else:
-            logger.error(f"Erro ao buscar {endpoint}: {response.status_code}")
-            return []
-    except Exception as e:
-        logger.error(f"Erro ao conectar ao Supabase: {str(e)}")
-        return []
-
-
-def save_to_supabase(endpoint: str, data: dict) -> bool:
-    """Salvar dados no Supabase via REST API"""
-    try:
-        url = f"{SUPABASE_URL}/rest/v1/{endpoint}"
-        headers = {
-            "apikey": SUPABASE_KEY,
-            "Authorization": f"Bearer {SUPABASE_KEY}",
-            "Content-Type": "application/json",
-            "Prefer": "return=minimal",
-        }
-        response = requests.post(url, headers=headers, json=data, timeout=10)
-        return response.status_code in [200, 201]
-    except Exception as e:
-        logger.error(f"Erro ao salvar no Supabase: {str(e)}")
-        return False
+# Configuração do Supabase e helpers de acesso movidos para
+# src/services/supabase_client.py (get_supabase_data / save_to_supabase
+# importados no topo deste arquivo) para eliminar duplicação com
+# src/services/energy_service.py.
 
 
 # Inicializar coletor
@@ -819,6 +783,122 @@ async def discover_local_devices():
         raise HTTPException(
             status_code=500, detail=f"Erro ao descobrir dispositivos: {str(e)}"
         )
+
+
+# ---------------------------------------------------------------------------
+# Endpoints de Energia (novos - namespace /energy/*)
+#
+# Substituem, para a nova SPA React, a lógica de agregação que hoje só
+# existe em dashboard.py. Não afetam os endpoints legados já stubados
+# (/status/realtime, /reports/daily, /devices/{id}/trends|weekly|monthly,
+# /devices/ranking), que permanecem como estão.
+# ---------------------------------------------------------------------------
+
+
+@app.get("/energy/overview")
+async def get_energy_overview(tariff: Optional[float] = None):
+    """Obter visão geral em tempo real dos dispositivos TAPO (resumo + lista)."""
+    try:
+        tapo_devices, tapo_readings, raw_devices = fetch_tapo_devices_and_readings(
+            days=7
+        )
+        return build_energy_overview(tapo_devices, tapo_readings, raw_devices)
+    except Exception as e:
+        logger.error(f"Erro ao obter visão geral de energia: {str(e)}")
+        raise HTTPException(
+            status_code=500, detail="Erro ao obter visão geral de energia"
+        )
+
+
+@app.get("/energy/history")
+async def get_energy_history(days: int = 30):
+    """Obter histórico de potência instantânea por dispositivo TAPO."""
+    try:
+        tapo_devices, tapo_readings, _ = fetch_tapo_devices_and_readings(days=days)
+        series = build_power_history(tapo_devices, tapo_readings)
+        return {"days": days, "series": series}
+    except Exception as e:
+        logger.error(f"Erro ao obter histórico de energia: {str(e)}")
+        raise HTTPException(
+            status_code=500, detail="Erro ao obter histórico de energia"
+        )
+
+
+@app.get("/energy/daily")
+async def get_energy_daily(days: int = 90, tariff: Optional[float] = None):
+    """Obter consumo e custo diário agregados entre todos os dispositivos TAPO."""
+    try:
+        _, tapo_readings, _ = fetch_tapo_devices_and_readings(days=days)
+        return build_daily_totals(tapo_readings, tariff)
+    except Exception as e:
+        logger.error(f"Erro ao obter consumo diário de energia: {str(e)}")
+        raise HTTPException(
+            status_code=500, detail="Erro ao obter consumo diário de energia"
+        )
+
+
+@app.get("/energy/monthly")
+async def get_energy_monthly(tariff: Optional[float] = None):
+    """Obter consumo e custo mensal agregados entre todos os dispositivos TAPO."""
+    try:
+        # Mesma janela de 90 dias usada em dashboard.py para os gráficos
+        # agregados (a busca ao Supabase já era limitada a 90 dias ali).
+        _, tapo_readings, _ = fetch_tapo_devices_and_readings(days=90)
+        return build_monthly_totals(tapo_readings, tariff)
+    except Exception as e:
+        logger.error(f"Erro ao obter consumo mensal de energia: {str(e)}")
+        raise HTTPException(
+            status_code=500, detail="Erro ao obter consumo mensal de energia"
+        )
+
+
+@app.get("/energy/projections")
+async def get_energy_projections(tariff: Optional[float] = None):
+    """Obter projeções diária/semanal/mensal de consumo e custo por dispositivo TAPO."""
+    try:
+        tapo_devices, tapo_readings, _ = fetch_tapo_devices_and_readings(days=90)
+        return build_projections(tapo_devices, tapo_readings, tariff)
+    except Exception as e:
+        logger.error(f"Erro ao obter projeções de energia: {str(e)}")
+        raise HTTPException(
+            status_code=500, detail="Erro ao obter projeções de energia"
+        )
+
+
+@app.get("/energy/devices/{device_id}")
+async def get_energy_device_detail(
+    device_id: int, days: int = 30, tariff: Optional[float] = None
+):
+    """Obter detalhes, séries e detecção de anomalia de um dispositivo TAPO."""
+    try:
+        tapo_devices, tapo_readings, _ = fetch_tapo_devices_and_readings(days=days)
+        device = next((d for d in tapo_devices if d["id"] == device_id), None)
+
+        if device is None:
+            raise HTTPException(
+                status_code=404,
+                detail="Dispositivo TAPO não encontrado ou não classificado",
+            )
+
+        return build_device_detail(device, tapo_readings, days, tariff)
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Erro ao obter detalhes do dispositivo de energia: {str(e)}")
+        raise HTTPException(
+            status_code=500, detail="Erro ao obter detalhes do dispositivo"
+        )
+
+
+@app.get("/smartlife/latest")
+async def get_smartlife_latest():
+    """Obter o snapshot mais recente de dados SmartLife (gerado pelo polling do Gmail)."""
+    try:
+        return load_smartlife_snapshot()
+    except Exception as e:
+        logger.error(f"Erro ao carregar dados SmartLife: {str(e)}")
+        return {}
 
 
 if __name__ == "__main__":

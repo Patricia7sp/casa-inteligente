@@ -111,7 +111,7 @@ SERVICE_URL=$(gcloud run services describe $SERVICE_NAME \
 log "✅ Deploy concluído com sucesso!"
 log "🌐 URL do serviço: $SERVICE_URL"
 log "📊 Dashboard: $SERVICE_URL/docs"
-log "📱 Streamlit Dashboard: $SERVICE_URL" # Se configurado
+log "📱 Frontend: deploy separado via frontend/Dockerfile (ver .github/workflows/ci-cd.yml)"
 
 # Testar se o serviço está online
 log "Verificando se o serviço está online..."

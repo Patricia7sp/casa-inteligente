@@ -23,7 +23,7 @@ env:
   SERVICE_NAME: casa-inteligente
   API_SERVICE_URL: https://casa-inteligente-858582953113.us-central1.run.app
   API_SERVICE_TARGET: casa-inteligente-858582953113.us-central1.run.app:443
-  STREAMLIT_SERVICE_NAME: casa-inteligente-dashboard
+  FRONTEND_SERVICE_NAME: casa-inteligente-dashboard
   PROMETHEUS_SERVICE_NAME: casa-inteligente-prometheus
   GRAFANA_SERVICE_NAME: casa-inteligente-grafana
 
@@ -193,7 +193,7 @@ jobs:
           --set-env-vars COLLECTOR_INIT_TIMEOUT_SECONDS=5 \
           --set-env-vars COLLECTION_INTERVAL_MINUTES=15
 
-  build_streamlit:
+  build_frontend:
     needs: [security]
     runs-on: ubuntu-latest
     if: github.ref == 'refs/heads/main' && always()
@@ -218,19 +218,21 @@ jobs:
     - name: Configure Docker for Artifact Registry
       run: gcloud auth configure-docker us-central1-docker.pkg.dev
 
-    - name: Build Streamlit image
+    - name: Build frontend image
       run: |
-        docker build -f docker/streamlit/Dockerfile \
-          -t $REGISTRY/$PROJECT_ID/$REPOSITORY/streamlit:$GITHUB_SHA \
-          -t $REGISTRY/$PROJECT_ID/$REPOSITORY/streamlit:latest .
+        docker build -f frontend/Dockerfile \
+          --build-arg VITE_API_BASE_URL=${{ env.API_SERVICE_URL }} \
+          -t $REGISTRY/$PROJECT_ID/$REPOSITORY/frontend:$GITHUB_SHA \
+          -t $REGISTRY/$PROJECT_ID/$REPOSITORY/frontend:latest \
+          frontend
 
-    - name: Push Streamlit image
+    - name: Push frontend image
       run: |
-        docker push $REGISTRY/$PROJECT_ID/$REPOSITORY/streamlit:$GITHUB_SHA
-        docker push $REGISTRY/$PROJECT_ID/$REPOSITORY/streamlit:latest
+        docker push $REGISTRY/$PROJECT_ID/$REPOSITORY/frontend:$GITHUB_SHA
+        docker push $REGISTRY/$PROJECT_ID/$REPOSITORY/frontend:latest
 
-  deploy_streamlit:
-    needs: [build_streamlit]
+  deploy_frontend:
+    needs: [build_frontend]
     runs-on: ubuntu-latest
     if: github.ref == 'refs/heads/main'
 
@@ -251,19 +253,18 @@ jobs:
     - name: Configure gcloud project
       run: gcloud config set project ${{ secrets.GCP_PROJECT_ID }}
 
-    - name: Deploy Streamlit to Cloud Run
+    - name: Deploy frontend to Cloud Run
       run: |
-        gcloud run deploy $STREAMLIT_SERVICE_NAME \
-          --image $REGISTRY/$PROJECT_ID/$REPOSITORY/streamlit:$GITHUB_SHA \
+        gcloud run deploy $FRONTEND_SERVICE_NAME \
+          --image $REGISTRY/$PROJECT_ID/$REPOSITORY/frontend:$GITHUB_SHA \
           --region us-central1 \
           --platform managed \
           --allow-unauthenticated \
-          --port 8501 \
+          --port 8080 \
           --memory 512Mi \
           --cpu 1 \
           --timeout 300 \
-          --max-instances 5 \
-          --set-env-vars API_BASE_URL=${{ env.API_SERVICE_URL }}
+          --max-instances 5
 
   build_prometheus:
     needs: [security]
