@@ -143,9 +143,6 @@ Thumbs.db
 *.swo
 *~
 
-# Docker
-.dockerignore
-
 # Google Cloud
 .gcloudignore
 service-account-key.json
@@ -227,5 +224,6 @@ logs/*.log
 # Arquivos HTML baixados
 *.html
 !docs/**/*.html
+!frontend/**/*.html
 
 .databricks
