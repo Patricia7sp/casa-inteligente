@@ -393,7 +393,9 @@ def build_energy_overview(
 # ---------------------------------------------------------------------------
 
 
-def build_power_history(tapo_devices: List[Dict], tapo_readings: List[Dict]) -> List[Dict]:
+def build_power_history(
+    tapo_devices: List[Dict], tapo_readings: List[Dict]
+) -> List[Dict]:
     """Construir séries de potência instantânea por dispositivo para /energy/history."""
 
     df = _readings_dataframe(tapo_readings)
@@ -516,10 +518,15 @@ def build_daily_totals(readings: List[Dict], tariff: Optional[float] = None) -> 
             },
         }
 
-    energy_col = "energy_today_kwh" if "energy_today_kwh" in daily_agg.columns else "energy_kwh"
+    energy_col = (
+        "energy_today_kwh" if "energy_today_kwh" in daily_agg.columns else "energy_kwh"
+    )
 
     daily_totals = (
-        daily_agg.groupby("period")[energy_col].sum().reset_index().sort_values("period")
+        daily_agg.groupby("period")[energy_col]
+        .sum()
+        .reset_index()
+        .sort_values("period")
     )
     daily_totals["cost"] = daily_totals[energy_col] * tariff_value
 
@@ -573,7 +580,9 @@ def build_monthly_totals(readings: List[Dict], tariff: Optional[float] = None) -
         return {"monthly": []}
 
     energy_col = (
-        "energy_today_kwh" if "energy_today_kwh" in monthly_agg.columns else "energy_kwh"
+        "energy_today_kwh"
+        if "energy_today_kwh" in monthly_agg.columns
+        else "energy_kwh"
     )
 
     monthly_totals = (
@@ -812,7 +821,9 @@ def build_device_detail(
         "color": color,
         "current_power_watts": round(current_power, 2),
         "last_reading_minutes_ago": minutes_ago,
-        "energy_today_kwh": round(energy_today, 3) if energy_today is not None else None,
+        "energy_today_kwh": (
+            round(energy_today, 3) if energy_today is not None else None
+        ),
         "cost_today_brl": round(cost_today, 2) if cost_today is not None else None,
         "avg_power_watts": round(avg_power, 2),
         "peak_power_watts": round(peak_power, 2),

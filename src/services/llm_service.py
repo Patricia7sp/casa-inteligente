@@ -355,9 +355,7 @@ Pergunta: "Qual dispositivo gasta mais?"
 
 LEMBRE-SE: Você TEM acesso ao banco de dados Supabase. O problema nunca é "falta de acesso", 
 mas sim "dados desatualizados" ou "sistema de coleta parado". Seja claro sobre isso!
-""".format(
-                settings.energy_cost_per_kwh
-            )
+""".format(settings.energy_cost_per_kwh)
 
             return context
 

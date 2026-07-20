@@ -28,7 +28,9 @@ SUPABASE_KEY = getattr(
 )
 
 
-def get_supabase_data(endpoint: str, params: Optional[Dict[str, Any]] = None) -> List[Dict]:
+def get_supabase_data(
+    endpoint: str, params: Optional[Dict[str, Any]] = None
+) -> List[Dict]:
     """Buscar dados do Supabase via REST API.
 
     Retorna sempre uma lista (vazia em caso de erro de rede ou status != 200),
